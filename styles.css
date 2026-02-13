@@ -1,75 +1,113 @@
+/* --- styles.css --- */
+
 body {
   font-family: "Inter", sans-serif;
-  background-color: #f3f4f6;
+  background-color: #f8fafc;
+  -webkit-tap-highlight-color: transparent;
+  /* CHỐNG TRÀN MÀN HÌNH NGANG */
+  overflow-x: hidden;
+  width: 100%;
 }
 
-/* Radio Scale Styles */
-.radio-scale input:checked + label {
-  background-color: #0d9488;
+/* Tối ưu form cho mobile: Giảm padding, tăng khoảng cách dòng */
+.survey-card {
+  background: white;
+  border-radius: 1rem;
+  padding: 1rem; /* Padding nhỏ hơn trên mobile để tiết kiệm diện tích */
+  margin-bottom: 1rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  border: 1px solid #e2e8f0;
+}
+
+/* Nút chọn điểm (Rating Circle) */
+.rating-input {
+  display: none; /* Ẩn radio mặc định */
+}
+
+.rating-label {
+  width: 44px; /* Chuẩn touch target của Apple/Google */
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%; /* Hình tròn */
+  border: 2px solid #e2e8f0;
+  font-weight: 700;
+  font-size: 1.1rem;
+  color: #64748b;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  cursor: pointer;
+  background-color: white;
+}
+
+/* Trạng thái khi chọn */
+.rating-input:checked + .rating-label {
+  background-color: #0d9488; /* Màu Teal */
   color: white;
   border-color: #0d9488;
+  transform: scale(1.1); /* Hiệu ứng phóng to nhẹ */
+  box-shadow: 0 4px 6px -1px rgba(13, 148, 136, 0.3);
 }
 
-.radio-scale input:checked + label.rate-low {
-  background-color: #ef4444;
-  border-color: #ef4444;
+/* Điểm thấp (1-3) sẽ có màu đỏ/cam để cảnh báo (tuỳ chọn) */
+.rating-input[value="1"]:checked + .rating-label,
+.rating-input[value="2"]:checked + .rating-label,
+.rating-input[value="3"]:checked + .rating-label {
+  background-color: #f59e0b; /* Màu Cam */
+  border-color: #f59e0b;
+  box-shadow: 0 4px 6px -1px rgba(245, 158, 11, 0.3);
 }
 
-/* Form Transition */
-.form-transition {
-  animation: fadeIn 0.3s ease-in-out;
+/* Text chú thích dưới điểm (Rất kém - Rất tốt) */
+.rating-text {
+  font-size: 0.65rem;
+  color: #94a3b8;
+  margin-top: 4px;
+  text-align: center;
+  font-weight: 500;
 }
 
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+.rating-input:checked ~ .rating-text {
+  color: #0d9488;
+  font-weight: 700;
 }
 
-/* Error Highlight */
+/* Error styles */
 .error-highlight {
-  border: 2px solid #ef4444 !important;
+  border: 1px solid #ef4444 !important;
   background-color: #fef2f2 !important;
-  animation: shake 0.5s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
 }
 
-@keyframes shake {
-  10%,
-  90% {
-    transform: translate3d(-1px, 0, 0);
+/* Responsive Font sizes */
+@media (max-width: 640px) {
+  .header-logo-text {
+    font-size: 0.9rem !important; /* Chữ nhỏ lại */
   }
-  20%,
-  80% {
-    transform: translate3d(2px, 0, 0);
+  .header-sub-text {
+    display: none; /* Ẩn tên bệnh viện dài dòng trên mobile */
   }
-  30%,
-  50%,
-  70% {
-    transform: translate3d(-4px, 0, 0);
+  .admin-btn-text {
+    display: none; /* Ẩn chữ "Quản trị" nếu màn hình quá bé, chỉ hiện icon */
   }
-  40%,
-  60% {
-    transform: translate3d(4px, 0, 0);
+  /* Hiện lại chữ quản trị trên màn hình > 350px (iphone SE trở lên) */
+  @media (min-width: 350px) {
+    .admin-btn-text {
+      display: inline;
+    }
   }
 }
 
-/* Loading Overlay */
+/* Loading overlay */
 .loading-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(255, 255, 255, 0.8);
+  background: rgba(255, 255, 255, 0.9);
   z-index: 100;
   display: none;
   align-items: center;
   justify-content: center;
   flex-direction: column;
 }
-
 .spinner {
   border: 4px solid #f3f3f3;
   border-top: 4px solid #0d9488;
@@ -78,7 +116,6 @@ body {
   height: 40px;
   animation: spin 1s linear infinite;
 }
-
 @keyframes spin {
   0% {
     transform: rotate(0deg);
@@ -86,11 +123,4 @@ body {
   100% {
     transform: rotate(360deg);
   }
-}
-
-/* Bulk Button Active State */
-.bulk-btn.active {
-  background-color: #0d9488;
-  color: white;
-  border-color: #0d9488;
 }

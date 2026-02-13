@@ -1260,6 +1260,7 @@ const survey = {
 
   createField(field) {
     const div = document.createElement("div");
+    // Grid column span
     div.className =
       field.width === "full" ? "col-span-1 md:col-span-2" : "col-span-1";
     div.id = `${field.id}_container`;
@@ -1267,153 +1268,185 @@ const survey = {
     const req = field.required ? "required" : "";
     let inputHTML = "";
 
+    // Style chung cho input mobile: cao 48px (chuẩn touch), chữ 16px (tránh zoom ios)
+    const baseInputClass =
+      "w-full border border-gray-300 p-3 rounded-lg focus:ring-2 focus:ring-teal-500 outline-none text-base appearance-none bg-white shadow-sm";
+
     switch (field.type) {
       case "select":
         inputHTML = `
-                    <select name="${field.id}" ${req} class="w-full border p-2 rounded focus:ring-2 focus:ring-teal-500 outline-none">
-                        <option value="">-- Chọn --</option>
-                        ${field.options.map((opt) => `<option value="${opt}">${opt}</option>`).join("")}
-                    </select>
-                `;
+            <div class="relative">
+                <select name="${field.id}" ${req} class="${baseInputClass} pr-8">
+                    <option value="">-- Chạm để chọn --</option>
+                    ${field.options.map((opt) => `<option value="${opt}">${opt}</option>`).join("")}
+                </select>
+                <!-- Mũi tên chỉ xuống custom -->
+                <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-gray-500">
+                    <i class="fas fa-chevron-down text-xs"></i>
+                </div>
+            </div>
+        `;
         break;
 
       case "radio":
+        // Radio dạng nút bấm ngang hoặc dọc
         inputHTML = `
-                    <div class="flex flex-col sm:flex-row flex-wrap gap-2 mt-2">
-                        ${field.options
-                          .map(
-                            (opt) => `
-                            <label class="flex items-center p-2 border rounded hover:bg-gray-50 cursor-pointer">
-                                <input type="radio" name="${field.id}" value="${opt}" ${req} class="mr-2 w-4 h-4 text-teal-600 focus:ring-teal-500">
-                                ${opt}
-                            </label>
-                        `,
-                          )
-                          .join("")}
-                    </div>
-                `;
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-2">
+                ${field.options
+                  .map(
+                    (opt) => `
+                    <label class="flex items-center p-3 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer active:bg-teal-50 transition select-none">
+                        <input type="radio" name="${field.id}" value="${opt}" ${req} 
+                            class="w-5 h-5 text-teal-600 focus:ring-teal-500 border-gray-300 mr-3">
+                        <span class="text-sm font-medium text-gray-700">${opt}</span>
+                    </label>
+                `,
+                  )
+                  .join("")}
+            </div>
+        `;
         break;
 
       case "textarea":
         inputHTML = `
-                    <textarea name="${field.id}" rows="3" ${req} 
-                        class="w-full border p-2 rounded focus:ring-2 focus:ring-teal-500 outline-none" 
-                        placeholder="Nhập ý kiến của bạn..."></textarea>
-                `;
+            <textarea name="${field.id}" rows="3" ${req} 
+                class="${baseInputClass}" 
+                placeholder="Nhập ý kiến của bạn..."></textarea>
+        `;
         break;
 
-      default:
+      default: // text, number, tel...
         inputHTML = `
-                    <div class="flex items-center">
-                        <input type="${field.type}" name="${field.id}" ${req} 
-                            class="w-full border p-2 rounded focus:ring-2 focus:ring-teal-500 outline-none" 
-                            placeholder="${field.placeholder || ""}">
-                        ${field.suffix ? `<span class="ml-2 font-bold">${field.suffix}</span>` : ""}
-                    </div>
-                `;
+            <div class="relative">
+                <input type="${field.type}" name="${field.id}" ${req} 
+                    class="${baseInputClass}" 
+                    placeholder="${field.placeholder || ""}"
+                    ${field.type === "number" ? 'pattern="[0-9]*" inputmode="numeric"' : ""}> 
+                    <!-- inputmode numeric giúp hiện bàn phím số trên mobile -->
+                ${field.suffix ? `<span class="absolute right-3 top-3 text-gray-400 font-bold">${field.suffix}</span>` : ""}
+            </div>
+        `;
     }
 
     div.innerHTML = `
-            <label class="block text-sm font-medium mb-1 text-gray-700">
+        <div class="mb-4">
+            <label class="block text-sm font-bold mb-2 text-gray-700 uppercase tracking-wide">
                 ${field.label} 
                 ${field.required ? '<span class="text-red-500">*</span>' : ""}
             </label>
             ${inputHTML}
-            <div class="text-xs text-red-500 hidden mt-1 error-msg">Vui lòng nhập thông tin này</div>
-        `;
+            <div class="text-xs text-red-500 hidden mt-2 error-msg font-medium">
+                <i class="fas fa-info-circle"></i> Vui lòng nhập thông tin này
+            </div>
+        </div>
+    `;
 
     return div;
   },
 
   createQuestion(question) {
     const div = document.createElement("div");
-    div.className =
-      "mb-6 pb-6 border-b last:border-0 transition-colors duration-300 rounded p-2";
+    // Sử dụng class 'survey-card' từ CSS mới
+    div.className = "survey-card relative transition-all duration-300";
     div.id = `${question.id}_container`;
 
     let optionsHTML = "";
 
     if (question.isCost) {
-      // Special cost question
+      // --- XỬ LÝ CÂU HỎI VỀ CHI PHÍ (Dạng liệt kê dọc) ---
+      // Trên mobile, dạng liệt kê dọc (vertical stack) dễ đọc hơn
       const costOptions = [
         "1. Rất đắt so với chất lượng",
         "2. Đắt hơn so với chất lượng",
         "3. Tương xứng so với chất lượng",
         "4. Rẻ hơn so với chất lượng",
-        "5. Không tự chi trả nên không biết",
+        "5. Không tự chi trả / Không biết",
         "6. Ý kiến khác",
       ];
 
       optionsHTML = `
-                <div class="mt-2 space-y-2">
-                    ${costOptions
-                      .map(
-                        (opt) => `
-                        <label class="flex items-center p-2 border rounded hover:bg-gray-50 cursor-pointer">
-                            <input type="radio" name="${question.id}" value="${opt}" required 
-                                class="mr-2 w-4 h-4 text-teal-600">
-                            ${opt}
-                        </label>
-                    `,
-                      )
-                      .join("")}
-                </div>
+        <div class="mt-3 space-y-2">
+            ${costOptions
+              .map((opt) => {
+                // Tách số thứ tự và nội dung để in đậm số
+                const parts = opt.split(". ");
+                const val = parts[0];
+                return `
+                <label class="flex items-start p-3 border border-gray-100 rounded-lg hover:bg-teal-50 cursor-pointer active:bg-teal-100 transition select-none">
+                    <input type="radio" name="${question.id}" value="${opt}" required 
+                        class="mt-1 mr-3 w-5 h-5 text-teal-600 border-gray-300 focus:ring-teal-500 shrink-0">
+                    <span class="text-sm text-gray-700 leading-snug">${opt}</span>
+                </label>
             `;
+              })
+              .join("")}
+        </div>
+      `;
     } else {
-      // Standard 1-5 scale (Đã sửa: Không hiện nút 0 nếu là form3)
+      // --- XỬ LÝ CÂU HỎI ĐIỂM SỐ (1-5) ---
+      // Tối ưu layout ngang cho mobile
       const showZero = app.currentForm.id !== "form3";
 
+      // Label ngắn gọn cho mobile
+      const labels = ["Rất kém", "Kém", "TB", "Tốt", "Rất tốt"];
+
       optionsHTML = `
-                <div class="flex gap-2 radio-scale justify-center sm:justify-start mt-2">
-                    ${[1, 2, 3, 4, 5]
-                      .map((val) => {
-                        const labels = [
-                          "Rất kém",
-                          "Kém",
-                          "TB",
-                          "Tốt",
-                          "Rất tốt",
-                        ];
-                        const lowClass = val <= 3 ? "rate-low" : "";
-                        return `
-                            <div class="flex flex-col items-center">
-                                <input type="radio" name="${question.id}" id="${question.id}_${val}" value="${val}" required class="hidden peer">
-                                <label for="${question.id}_${val}" class="${lowClass} w-10 h-10 flex items-center justify-center rounded-full border cursor-pointer hover:bg-gray-100 peer-checked:text-white transition font-bold">
-                                    ${val}
-                                </label>
-                                <span class="text-[10px] text-gray-400 mt-1">${labels[val - 1]}</span>
-                            </div>
-                        `;
-                      })
-                      .join("")}
-                    
-                    ${
-                      showZero
-                        ? `
-                    <div class="flex flex-col items-center ml-4 border-l pl-4">
-                        <input type="radio" name="${question.id}" id="${question.id}_0" value="0" required class="hidden peer">
-                        <label for="${question.id}_0" class="w-10 h-10 flex items-center justify-center rounded-full border cursor-pointer hover:bg-gray-100 peer-checked:bg-gray-500 peer-checked:text-white transition font-bold">
-                            0
+        <div class="mt-4">
+            <!-- Container nút điểm: Flex justify-between để dàn đều trên mọi màn hình -->
+            <div class="flex justify-between items-start w-full px-1">
+                ${[1, 2, 3, 4, 5]
+                  .map(
+                    (val) => `
+                    <div class="flex flex-col items-center group w-1/5">
+                        <input type="radio" name="${question.id}" id="${question.id}_${val}" value="${val}" required class="rating-input">
+                        <label for="${question.id}_${val}" class="rating-label shadow-sm">
+                            ${val}
                         </label>
-                        <span class="text-[10px] text-gray-400 mt-1">N/A</span>
+                        <span class="rating-text">${labels[val - 1]}</span>
                     </div>
-                    `
-                        : ""
-                    }
+                `,
+                  )
+                  .join("")}
+            </div>
+
+            ${
+              showZero
+                ? `
+            <!-- Nút N/A (0 điểm) tách riêng một chút nếu có -->
+            <div class="mt-4 pt-3 border-t border-gray-100 flex justify-end items-center">
+                <span class="text-xs text-gray-400 mr-2">Không áp dụng:</span>
+                <div class="flex flex-col items-center">
+                    <input type="radio" name="${question.id}" id="${question.id}_0" value="0" class="rating-input">
+                    <label for="${question.id}_0" class="rating-label !w-10 !h-10 !text-sm text-gray-400 !border-gray-200">
+                        N/A
+                    </label>
                 </div>
-            `;
+            </div>
+            `
+                : ""
+            }
+        </div>
+      `;
     }
 
     div.innerHTML = `
-            <div class="mb-2">
-                <span class="font-bold text-teal-800 text-lg mr-2">${question.id.replace("S_", "")}.</span>
-                <span class="font-medium">${question.text} ${question.required ? '<span class="text-red-500">*</span>' : ""}</span>
-            </div>
-            ${optionsHTML}
-            <div class="text-xs text-red-500 hidden mt-2 font-bold error-msg">
-                <i class="fas fa-exclamation-circle"></i> Vui lòng chọn một tùy chọn
-            </div>
-        `;
+        <div class="mb-2">
+            <!-- Mã câu hỏi nhỏ, màu nhạt -->
+            <span class="text-xs font-bold text-teal-600 bg-teal-50 px-2 py-1 rounded mb-1 inline-block">
+                ${question.id.replace("S_", "")}
+            </span>
+            <!-- Nội dung câu hỏi lớn hơn -->
+            <h3 class="font-medium text-gray-800 question-text text-base md:text-lg">
+                ${question.text} 
+                ${question.required ? '<span class="text-red-500 ml-1">*</span>' : ""}
+            </h3>
+        </div>
+        ${optionsHTML}
+        <!-- Thông báo lỗi -->
+        <div class="text-xs text-red-500 hidden mt-3 font-bold error-msg flex items-center bg-red-50 p-2 rounded">
+            <i class="fas fa-exclamation-circle mr-1"></i> Vui lòng chọn đáp án
+        </div>
+    `;
 
     return div;
   },
