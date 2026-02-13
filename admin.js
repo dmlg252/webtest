@@ -4,13 +4,14 @@
 
 const ADMIN_CREDENTIAL = {
   username: "admin",
-  password: "admin123", // đổi mật khẩu mặc định
+  password: "qlcl@123", // đổi mật khẩu mặc định
 };
 
 const admin = {
   auth: false,
   selected: [],
   editId: null,
+  filteredData: [], // Biến lưu trữ dữ liệu đang hiển thị để xuất Excel
 
   // Toggle between public and admin view
   async toggleView() {
@@ -115,7 +116,7 @@ const admin = {
     try {
       const data = await db.getAll(true);
       this.renderStats(data);
-      this.filterTable();
+      this.filterTable(); // Gọi filter để tính toán filteredData và render
       this.updateBulkUI();
     } catch (error) {
       tbody.innerHTML =
@@ -157,22 +158,51 @@ const admin = {
     document.getElementById("stat-avg").textContent = avg + "%";
   },
 
-  // Filter table
+  // ===============================================
+  // FILTER TABLE (LOGIC MỚI: GỘP TẤT CẢ BỘ LỌC)
+  // ===============================================
   filterTable() {
     const searchText = document
       .getElementById("searchInput")
       .value.toLowerCase();
     const formType = document.getElementById("filterFormType").value;
+    const dateFrom = document.getElementById("filterDateFrom").value;
+    const dateTo = document.getElementById("filterDateTo").value;
 
-    const data = db.cache.filter((record) => {
+    // Lọc dữ liệu từ cache
+    this.filteredData = db.cache.filter((record) => {
+      // 1. Lọc Loại phiếu
       const matchesType = formType === "all" || record.type === formType;
+
+      // 2. Lọc Tìm kiếm (Mã phiếu, ID...)
       const matchesSearch =
         !searchText ||
         JSON.stringify(record).toLowerCase().includes(searchText);
-      return matchesType && matchesSearch;
+
+      // 3. Lọc Thời gian
+      let matchesDate = true;
+      if (dateFrom || dateTo) {
+        const recordDate = new Date(record.timestamp);
+        recordDate.setHours(0, 0, 0, 0); // Reset giờ phút giây để so sánh ngày chuẩn
+
+        if (dateFrom) {
+          const fromDate = new Date(dateFrom);
+          fromDate.setHours(0, 0, 0, 0);
+          if (recordDate < fromDate) matchesDate = false;
+        }
+
+        if (dateTo && matchesDate) {
+          const toDate = new Date(dateTo);
+          toDate.setHours(23, 59, 59, 999); // Tính hết ngày đó
+          if (recordDate > toDate) matchesDate = false;
+        }
+      }
+
+      return matchesType && matchesSearch && matchesDate;
     });
 
-    this.renderTable(data);
+    // Render dữ liệu đã lọc
+    this.renderTable(this.filteredData);
   },
 
   // Render table
@@ -267,11 +297,12 @@ const admin = {
   toggleSelectAll() {
     const checked = document.getElementById("selectAll").checked;
     if (checked) {
-      this.selected = db.cache.map((record) => record.id);
+      // Chỉ chọn các mục ĐANG HIỂN THỊ (Đã lọc)
+      this.selected = this.filteredData.map((record) => record.id);
     } else {
       this.selected = [];
     }
-    this.filterTable();
+    this.filterTable(); // Re-render để update checkbox UI
     this.updateBulkUI();
   },
 
@@ -389,12 +420,64 @@ const admin = {
   },
 
   // ============================================
+  // EXPORT EXCEL LOGIC (TRỰC TIẾP)
+  // ============================================
+
+  exportExcel() {
+    // 1. Xác định dữ liệu cần xuất
+    // Nếu có chọn checkbox -> Chỉ xuất dòng chọn
+    // Nếu KHÔNG chọn gì -> Xuất toàn bộ bảng đang hiển thị (đã lọc)
+    let dataToExport = [];
+
+    if (this.selected.length > 0) {
+      // Lấy theo ID đã chọn từ bộ nhớ cache
+      dataToExport = db.cache.filter((record) =>
+        this.selected.includes(record.id),
+      );
+    } else {
+      // Lấy theo dữ liệu đang hiển thị (đã qua bộ lọc ngày, search...)
+      dataToExport = this.filteredData;
+    }
+
+    if (!dataToExport || dataToExport.length === 0) {
+      alert("Không có dữ liệu để xuất!");
+      return;
+    }
+
+    // 2. Format dữ liệu (Xóa cột hệ thống)
+    const cleanData = dataToExport.map((item) => {
+      // Destructure để loại bỏ các trường hệ thống không cần thiết
+      const { python_data, selenium_status, ...rest } = item;
+      return rest;
+    });
+
+    try {
+      // 3. Tạo Workbook
+      const worksheet = XLSX.utils.json_to_sheet(cleanData);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, "DuLieuKhaoSat");
+
+      // 4. Tạo tên file (thêm ngày tháng)
+      const dateStr = new Date().toISOString().slice(0, 10);
+      const count = cleanData.length;
+      const fileName = `BaoCao_KhaoSat_BVPS_${dateStr}_(${count}_phieu).xlsx`;
+
+      // 5. Tải xuống
+      XLSX.writeFile(workbook, fileName);
+      app.showToast("Thành công", `Đã xuất ${count} phiếu ra Excel`);
+    } catch (e) {
+      console.error(e);
+      alert("Lỗi khi tạo file Excel: " + e.message);
+    }
+  },
+
+  // ============================================
   // EDIT MODAL: XỬ LÝ SỬA TOÀN BỘ (FULL EDIT)
   // ============================================
 
-  // Open edit modal for single record (Đã sửa lỗi ID String/Number)
+  // Open edit modal for single record
   openEditModal(id) {
-    this.editId = id;
+    this.editId = String(id); // Force string ID
     const record = db.cache.find((r) => String(r.id) === String(id));
 
     if (!record || !record.python_data) {
@@ -463,6 +546,8 @@ const admin = {
         questionDiv.className = "mb-4 pb-4 border-b last:border-0";
 
         const value = pythonData[question.id] || "";
+
+        // Logic tô màu cảnh báo điểm thấp (chỉ dùng để hiển thị container)
         const isLow =
           !question.isCost && parseInt(value) <= 3 && parseInt(value) > 0;
         const bgClass = isLow ? "bg-red-50 border border-red-200" : "";
@@ -486,25 +571,37 @@ const admin = {
           };
           inputHTML = this.renderInputControl(fakeField, value, true);
         } else {
-          // Điểm số 1-5
+          // === SỬA CHỮA CHÍNH: Cấu trúc Peer-Checked cho nút điểm số ===
           inputHTML = `
                 <div class="flex flex-wrap gap-2 mt-2">
                     ${scoreValues
                       .map((v) => {
-                        const checked = value == v ? "checked" : "";
-                        let colorClass = "bg-gray-100 hover:bg-gray-200";
-                        if (v <= 3 && v > 0)
-                          colorClass =
-                            "bg-red-100 hover:bg-red-200 text-red-700 border-red-200";
-                        if (checked)
-                          colorClass =
-                            "bg-teal-600 text-white ring-2 ring-teal-300 ring-offset-1";
+                        const isChecked = value == v ? "checked" : "";
+                        // Tạo ID duy nhất cho mỗi nút để Label hoạt động
+                        const uniqueId = `edit_${question.id}_${v}`;
+
+                        // Màu mặc định
+                        let baseColor =
+                          "bg-gray-100 text-gray-600 hover:bg-gray-200";
+
+                        // Màu khi được chọn (Active)
+                        let activeColor =
+                          "peer-checked:bg-teal-600 peer-checked:text-white peer-checked:border-teal-600 peer-checked:ring-2 peer-checked:ring-teal-200";
+
+                        // Nếu là điểm thấp (1-3), đổi màu active sang đỏ
+                        if (v <= 3 && v > 0) {
+                          activeColor =
+                            "peer-checked:bg-red-500 peer-checked:text-white peer-checked:border-red-500 peer-checked:ring-2 peer-checked:ring-red-200";
+                        }
 
                         return `
-                            <label class="${colorClass} w-10 h-10 rounded-full flex items-center justify-center font-bold cursor-pointer transition-all border border-transparent">
-                                <input type="radio" name="edit_${question.id}" value="${v}" ${checked} class="hidden">
-                                ${v}
-                            </label>
+                            <div class="relative">
+                                <input type="radio" name="edit_${question.id}" id="${uniqueId}" value="${v}" ${isChecked} class="peer hidden">
+                                <label for="${uniqueId}" 
+                                    class="w-10 h-10 rounded-full flex items-center justify-center font-bold cursor-pointer transition-all border border-transparent select-none ${baseColor} ${activeColor}">
+                                    ${v}
+                                </label>
+                            </div>
                         `;
                       })
                       .join("")}
@@ -513,7 +610,7 @@ const admin = {
         }
 
         questionDiv.innerHTML = `
-                    <div class="${bgClass} p-2 rounded">
+                    <div class="${bgClass} p-2 rounded transition-colors duration-300">
                         <div class="font-medium text-sm text-gray-700 mb-1">
                             <span class="font-bold text-teal-600 mr-1">${question.id}:</span> ${question.text}
                         </div>
@@ -559,21 +656,32 @@ const admin = {
       case "select":
         html += `<select name="${name}" class="w-full border p-2 rounded text-sm bg-gray-50 focus:bg-white focus:ring-2 focus:ring-teal-500 outline-none">
                 <option value="">-- Chọn --</option>
-                ${field.options.map((opt) => `<option value="${opt}" ${opt === currentValue ? "selected" : ""}>${opt}</option>`).join("")}
+                ${field.options
+                  .map(
+                    (opt) =>
+                      // So sánh lỏng (==) để bắt cả số và chuỗi
+                      `<option value="${opt}" ${opt == currentValue ? "selected" : ""}>${opt}</option>`,
+                  )
+                  .join("")}
             </select>`;
         break;
 
       case "radio":
-        html += `<div class="space-y-1 mt-1">
+        // Dùng native radio style nhưng bọc kỹ để dễ click
+        html += `<div class="space-y-2 mt-1">
                 ${field.options
-                  .map(
-                    (
-                      opt,
-                    ) => `<label class="flex items-center space-x-2 cursor-pointer hover:bg-gray-50 p-1 rounded">
-                        <input type="radio" name="${name}" value="${opt}" ${opt === currentValue ? "checked" : ""} class="text-teal-600 focus:ring-teal-500 h-4 w-4">
-                        <span class="text-sm text-gray-700">${opt}</span>
-                    </label>`,
-                  )
+                  .map((opt, index) => {
+                    const uniqueId = `${name}_opt_${index}`; // ID duy nhất cho label for
+                    return `
+                        <div class="flex items-center">
+                            <input type="radio" id="${uniqueId}" name="${name}" value="${opt}" ${opt == currentValue ? "checked" : ""} 
+                                class="w-4 h-4 text-teal-600 border-gray-300 focus:ring-teal-500 cursor-pointer">
+                            <label for="${uniqueId}" class="ml-2 block text-sm text-gray-700 cursor-pointer select-none">
+                                ${opt}
+                            </label>
+                        </div>
+                      `;
+                  })
                   .join("")}
             </div>`;
         break;
@@ -614,40 +722,80 @@ const admin = {
             ? form2Structure
             : form3Structure;
 
+      const modalContainer = document.getElementById("edit-form-container");
+
+      // Helper lấy giá trị từ input
       const getValue = (fieldId, type) => {
         const name = `edit_${fieldId}`;
         if (type === "radio") {
-          const el = document.querySelector(`input[name="${name}"]:checked`);
+          const el = modalContainer.querySelector(
+            `input[name="${name}"]:checked`,
+          );
           return el ? el.value : "";
         } else {
-          const el = document.querySelector(`[name="${name}"]`);
+          const el = modalContainer.querySelector(`[name="${name}"]`);
+          // Fallback nếu là radio
+          if (el && el.type === "radio") {
+            const checked = modalContainer.querySelector(
+              `input[name="${name}"]:checked`,
+            );
+            return checked ? checked.value : "";
+          }
           return el ? el.value : "";
         }
       };
 
-      // 1. Update Demographics
+      // === 1. TẠO OBJECT UPDATE ===
+      // python_data: chứa JSON để load lại form sau này
+      // Các key khác: chứa tên cột hiển thị trên Google Sheet
+      const updates = {};
+
+      // --- A. Cập nhật Demographics (Hành chính) ---
       formStruct.demographics.forEach((field) => {
-        pythonData[field.id] = getValue(field.id, field.type);
+        const val = getValue(field.id, field.type);
+        pythonData[field.id] = val; // Lưu vào JSON
+
+        // Lưu vào cột Excel (dựa trên label)
+        // Ví dụ: field.label = "A1. Giới tính" -> updates["A1. Giới tính"] = "2. Nữ"
+        if (field.label) {
+          updates[field.label] = val;
+        }
       });
 
-      // 2. Update Sections
+      // --- B. Cập nhật Sections (Câu hỏi) ---
       formStruct.sections.forEach((section) => {
         section.questions.forEach((q) => {
-          pythonData[q.id] = getValue(q.id, "radio");
+          const val = getValue(q.id, "radio");
+          pythonData[q.id] = val; // Lưu vào JSON
+
+          // Lưu vào cột Excel (dựa trên mapToHeaders)
+          // Một câu hỏi code S_A1 có thể map ra cột "A1. Các sơ đồ..."
+          if (q.mapToHeaders && Array.isArray(q.mapToHeaders)) {
+            q.mapToHeaders.forEach((header) => {
+              updates[header] = val;
+            });
+          }
         });
       });
 
-      // 3. Update Footer
+      // --- C. Cập nhật Footer ---
       formStruct.footer.forEach((field) => {
-        pythonData[field.id] = getValue(field.id, field.type);
+        const val = getValue(field.id, field.type);
+        pythonData[field.id] = val; // Lưu vào JSON
+
+        if (field.label) {
+          updates[field.label] = val;
+        }
       });
 
-      await db.update([this.editId], {
-        python_data: JSON.stringify(pythonData),
-      });
+      // Đưa JSON đã update vào object gửi đi
+      updates["python_data"] = JSON.stringify(pythonData);
+
+      // === 2. GỬI LÊN SERVER ===
+      await db.update([this.editId], updates);
 
       document.getElementById("editRecordModal").classList.add("hidden");
-      app.showToast("Thành công", "Đã cập nhật chi tiết phiếu");
+      app.showToast("Thành công", "Đã cập nhật dữ liệu Google Sheet");
       await this.refresh();
     } catch (error) {
       console.error(error);
