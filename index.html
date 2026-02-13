@@ -1,0 +1,775 @@
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Hệ Thống Khảo Sát Hài Lòng - Bệnh viện Phụ Sản Hải Phòng</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
+    />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body class="text-gray-800 h-screen flex flex-col overflow-hidden bg-gray-50">
+    <!-- Loading UI -->
+    <div id="loading" class="loading-overlay backdrop-blur-sm">
+      <div class="spinner mb-4"></div>
+      <p class="text-teal-700 font-bold animate-pulse">Đang xử lý dữ liệu...</p>
+    </div>
+
+    <!-- Header (Luôn hiển thị) -->
+    <header class="bg-white shadow-sm z-50 flex-none border-b border-gray-200">
+      <div
+        class="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between"
+      >
+        <div
+          class="flex items-center space-x-3 cursor-pointer"
+          onclick="app.goHome()"
+        >
+          <div
+            class="bg-teal-600 text-white p-2 rounded-lg font-bold text-xl shadow-sm"
+          >
+            BVPS
+          </div>
+          <div>
+            <h1 class="text-lg font-bold text-gray-900 leading-tight">
+              KHẢO SÁT HÀI LÒNG
+            </h1>
+            <p class="text-xs text-gray-500 font-medium">
+              Bệnh viện Phụ Sản Hải Phòng
+            </p>
+          </div>
+        </div>
+        <div class="flex items-center gap-4">
+          <div class="hidden md:block text-right mr-4 border-l pl-4">
+            <p class="text-xs text-gray-500">Ngày khảo sát</p>
+            <p
+              class="text-sm font-bold text-teal-700"
+              id="currentDateHeader"
+            ></p>
+          </div>
+          <button
+            onclick="admin.toggleView()"
+            id="adminBtn"
+            class="bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium transition flex items-center shadow-sm"
+          >
+            <i class="fas fa-user-shield mr-2"></i> Quản trị
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <!-- Main Content Wrapper -->
+    <div class="flex-1 overflow-hidden relative">
+      <!-- === PAGE 1: SẢNH CHỜ (LOBBY) === -->
+      <main
+        id="landing-view"
+        class="h-full overflow-y-auto bg-slate-50 flex flex-col items-center justify-center p-4 transition-all duration-300"
+      >
+        <div class="text-center mb-10 max-w-2xl animate-fade-in-up">
+          <h2 class="text-3xl md:text-4xl font-bold text-gray-800 mb-4">
+            Chào mừng đến với hệ thống khảo sát
+          </h2>
+          <p class="text-gray-600 text-lg">
+            Ý kiến của Quý khách là thước đo chất lượng của chúng tôi. Vui lòng
+            chọn đối tượng khảo sát để bắt đầu.
+          </p>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 w-full max-w-6xl">
+          <!-- Card 1: Nội trú -->
+          <button
+            onclick="app.startSurvey(1)"
+            class="group bg-white p-8 rounded-2xl shadow-md hover:shadow-2xl border border-gray-100 hover:border-teal-500 transition-all duration-300 flex flex-col items-center text-center transform hover:-translate-y-1"
+          >
+            <div
+              class="w-24 h-24 bg-teal-50 text-teal-600 rounded-full flex items-center justify-center text-4xl mb-6 group-hover:scale-110 transition-transform duration-300 shadow-inner"
+            >
+              <i class="fas fa-procedures"></i>
+            </div>
+            <h3
+              class="text-2xl font-bold text-gray-800 mb-3 group-hover:text-teal-700"
+            >
+              Nội Trú
+            </h3>
+            <p class="text-gray-500 mb-6">
+              Dành cho bệnh nhân đang nằm điều trị tại bệnh viện (Mẫu 01)
+            </p>
+            <span
+              class="mt-auto px-6 py-2 bg-teal-50 text-teal-700 rounded-full text-sm font-bold group-hover:bg-teal-600 group-hover:text-white transition-colors"
+              >Bắt đầu khảo sát <i class="fas fa-arrow-right ml-1"></i
+            ></span>
+          </button>
+
+          <!-- Card 2: Ngoại trú -->
+          <button
+            onclick="app.startSurvey(2)"
+            class="group bg-white p-8 rounded-2xl shadow-md hover:shadow-2xl border border-gray-100 hover:border-blue-500 transition-all duration-300 flex flex-col items-center text-center transform hover:-translate-y-1"
+          >
+            <div
+              class="w-24 h-24 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center text-4xl mb-6 group-hover:scale-110 transition-transform duration-300 shadow-inner"
+            >
+              <i class="fas fa-stethoscope"></i>
+            </div>
+            <h3
+              class="text-2xl font-bold text-gray-800 mb-3 group-hover:text-blue-700"
+            >
+              Ngoại Trú
+            </h3>
+            <p class="text-gray-500 mb-6">
+              Dành cho bệnh nhân đến khám và ra về trong ngày (Mẫu 02)
+            </p>
+            <span
+              class="mt-auto px-6 py-2 bg-blue-50 text-blue-700 rounded-full text-sm font-bold group-hover:bg-blue-600 group-hover:text-white transition-colors"
+              >Bắt đầu khảo sát <i class="fas fa-arrow-right ml-1"></i
+            ></span>
+          </button>
+
+          <!-- Card 3: Nhân viên -->
+          <button
+            onclick="app.startSurvey(3)"
+            class="group bg-white p-8 rounded-2xl shadow-md hover:shadow-2xl border border-gray-100 hover:border-purple-500 transition-all duration-300 flex flex-col items-center text-center transform hover:-translate-y-1"
+          >
+            <div
+              class="w-24 h-24 bg-purple-50 text-purple-600 rounded-full flex items-center justify-center text-4xl mb-6 group-hover:scale-110 transition-transform duration-300 shadow-inner"
+            >
+              <i class="fas fa-user-md"></i>
+            </div>
+            <h3
+              class="text-2xl font-bold text-gray-800 mb-3 group-hover:text-purple-700"
+            >
+              Nhân Viên
+            </h3>
+            <p class="text-gray-500 mb-6">
+              Dành cho cán bộ, nhân viên đang làm việc tại bệnh viện (Mẫu 03)
+            </p>
+            <span
+              class="mt-auto px-6 py-2 bg-purple-50 text-purple-700 rounded-full text-sm font-bold group-hover:bg-purple-600 group-hover:text-white transition-colors"
+              >Bắt đầu khảo sát <i class="fas fa-arrow-right ml-1"></i
+            ></span>
+          </button>
+        </div>
+
+        <div class="mt-12 text-sm text-gray-400">
+          &copy; 2026 Hệ thống quản lý chất lượng bệnh viện
+        </div>
+      </main>
+
+      <!-- === PAGE 2: FORM KHẢO SÁT === -->
+      <main
+        id="survey-view"
+        class="hidden h-full overflow-y-auto bg-gray-50 transition-all duration-300"
+      >
+        <div class="max-w-3xl mx-auto px-4 py-8">
+          <!-- Navigation -->
+          <div class="flex items-center justify-between mb-6">
+            <button
+              onclick="app.goHome()"
+              class="flex items-center text-gray-500 hover:text-teal-700 font-medium transition group"
+            >
+              <div
+                class="w-8 h-8 rounded-full bg-white border border-gray-200 flex items-center justify-center mr-2 group-hover:border-teal-500"
+              >
+                <i class="fas fa-arrow-left text-sm"></i>
+              </div>
+              Quay lại chọn mẫu
+            </button>
+            <span
+              id="current-form-badge"
+              class="px-3 py-1 bg-teal-100 text-teal-800 rounded-full text-xs font-bold uppercase tracking-wide"
+            >
+              --
+            </span>
+          </div>
+
+          <!-- Intro Text -->
+          <div
+            class="bg-blue-50 p-4 rounded-xl border border-blue-100 text-sm text-blue-800 mb-6 flex gap-3"
+          >
+            <i class="fas fa-info-circle text-xl mt-0.5"></i>
+            <div>
+              <p class="font-bold mb-1">Lưu ý quan trọng:</p>
+              <ul class="list-disc pl-4 space-y-1">
+                <li>
+                  Các mục có dấu (<span class="text-red-500">*</span>) là bắt
+                  buộc phải nhập.
+                </li>
+                <li>Thông tin của Ông/Bà sẽ được bảo mật tuyệt đối.</li>
+              </ul>
+            </div>
+          </div>
+
+          <!-- Survey Form -->
+          <form
+            id="surveyForm"
+            onsubmit="survey.handleSubmit(event)"
+            class="form-transition space-y-6 pb-12"
+            novalidate
+          >
+            <!-- Nội dung form sẽ được Javascript render vào đây -->
+          </form>
+        </div>
+      </main>
+
+      <!-- === PAGE 3: ADMIN DASHBOARD === -->
+      <main id="admin-view" class="hidden h-full flex bg-gray-100">
+        <!-- Sidebar -->
+        <aside
+          class="w-64 bg-white border-r border-gray-200 hidden md:flex flex-col z-10 shadow-sm"
+        >
+          <div class="p-6">
+            <h2
+              class="text-xs uppercase font-bold text-gray-400 tracking-wider mb-4"
+            >
+              Menu Quản Lý
+            </h2>
+            <nav class="space-y-1">
+              <button
+                onclick="admin.refresh()"
+                class="w-full flex items-center px-4 py-3 bg-teal-50 text-teal-700 rounded-lg font-medium border border-teal-100 text-left"
+              >
+                <i class="fas fa-chart-pie w-6"></i> Tổng quan
+              </button>
+              <button
+                onclick="admin.openSessionConfig()"
+                class="w-full flex items-center px-4 py-3 text-gray-600 hover:bg-gray-50 rounded-lg font-medium transition text-left"
+              >
+                <i class="fas fa-sliders-h w-6"></i> Cấu hình Phiên
+              </button>
+              <button
+                onclick="admin.openConfig()"
+                class="w-full flex items-center px-4 py-3 text-gray-600 hover:bg-gray-50 rounded-lg font-medium transition text-left"
+              >
+                <i class="fas fa-cogs w-6"></i> Kết nối Google Sheet
+              </button>
+            </nav>
+
+            <!-- Session Status Widget -->
+            <div
+              class="mt-6 bg-gray-50 p-3 rounded border border-gray-200 text-xs"
+            >
+              <p class="font-bold text-gray-500 uppercase mb-1">
+                Trạng thái Phiên
+              </p>
+              <div class="mb-1">
+                <span class="text-gray-400">PV:</span>
+                <span
+                  id="admin-lbl-interviewer"
+                  class="font-medium text-teal-700"
+                  >--</span
+                >
+              </div>
+              <div>
+                <span class="text-gray-400">TL:</span>
+                <span
+                  id="admin-lbl-respondent"
+                  class="font-medium text-teal-700"
+                  >--</span
+                >
+              </div>
+            </div>
+          </div>
+          <div class="mt-auto p-6 border-t border-gray-100">
+            <button
+              onclick="admin.logout()"
+              class="flex items-center text-red-600 hover:text-red-700 font-medium text-sm"
+            >
+              <i class="fas fa-sign-out-alt w-6"></i> Đăng xuất
+            </button>
+          </div>
+        </aside>
+
+        <!-- Admin Content -->
+        <div class="flex-1 flex flex-col overflow-hidden">
+          <!-- Stats -->
+          <div
+            class="bg-white border-b border-gray-200 p-6 grid grid-cols-2 lg:grid-cols-4 gap-4 shadow-sm"
+          >
+            <div class="bg-blue-50 p-4 rounded-xl border border-blue-200">
+              <p class="text-xs text-blue-600 font-bold uppercase">
+                Tổng phiếu
+              </p>
+              <p class="text-2xl font-bold text-gray-800 mt-1" id="stat-total">
+                0
+              </p>
+            </div>
+            <div class="bg-green-50 p-4 rounded-xl border border-green-200">
+              <p class="text-xs text-green-600 font-bold uppercase">Nội trú</p>
+              <p class="text-2xl font-bold text-gray-800 mt-1" id="stat-form1">
+                0
+              </p>
+            </div>
+            <div class="bg-purple-50 p-4 rounded-xl border border-purple-200">
+              <p class="text-xs text-purple-600 font-bold uppercase">
+                Ngoại trú
+              </p>
+              <p class="text-2xl font-bold text-gray-800 mt-1" id="stat-form2">
+                0
+              </p>
+            </div>
+            <div class="bg-orange-50 p-4 rounded-xl border border-orange-200">
+              <p class="text-xs text-orange-600 font-bold uppercase">Điểm TB</p>
+              <p class="text-2xl font-bold text-gray-800 mt-1" id="stat-avg">
+                0.0
+              </p>
+            </div>
+          </div>
+
+          <!-- Toolbar -->
+          <div
+            class="px-6 py-4 bg-gray-50 border-b border-gray-200 flex flex-col md:flex-row justify-between items-center gap-4"
+          >
+            <div class="flex gap-2 w-full md:w-auto">
+              <div class="relative w-full md:w-64">
+                <input
+                  type="text"
+                  id="searchInput"
+                  onkeyup="admin.filterTable()"
+                  placeholder="Tìm mã phiếu..."
+                  class="w-full pl-10 pr-4 py-2 bg-white border border-gray-300 rounded-lg text-sm focus:ring-teal-500 outline-none"
+                />
+                <i
+                  class="fas fa-search absolute left-3 top-2.5 text-gray-400"
+                ></i>
+              </div>
+              <select
+                id="filterFormType"
+                onchange="admin.filterTable()"
+                class="border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white outline-none"
+              >
+                <option value="all">Tất cả</option>
+                <option value="form1">Nội trú</option>
+                <option value="form2">Ngoại trú</option>
+                <option value="form3">Nhân viên</option>
+              </select>
+            </div>
+            <div class="flex gap-2 items-center">
+              <div
+                id="bulk-actions"
+                class="hidden flex items-center gap-2 bg-white px-3 py-1 rounded-lg border border-gray-200 shadow-sm mr-2"
+              >
+                <span class="text-xs font-semibold text-gray-500">
+                  <span
+                    id="selected-count"
+                    class="text-teal-600 text-base font-bold"
+                    >0</span
+                  >
+                  chọn
+                </span>
+                <button
+                  onclick="admin.openBulkEdit()"
+                  class="text-blue-600 hover:bg-blue-50 px-2 py-1 rounded text-sm font-medium"
+                >
+                  <i class="fas fa-edit"></i> Sửa điểm
+                </button>
+                <button
+                  onclick="admin.deleteBulk()"
+                  class="text-red-600 hover:bg-red-50 px-2 py-1 rounded text-sm font-medium"
+                >
+                  <i class="fas fa-trash-alt"></i> Xóa
+                </button>
+              </div>
+              <button
+                onclick="admin.refresh()"
+                class="text-gray-600 hover:text-teal-600 p-2"
+              >
+                <i class="fas fa-sync-alt"></i>
+              </button>
+            </div>
+          </div>
+
+          <!-- Table -->
+          <div class="flex-1 overflow-auto p-6">
+            <div
+              class="bg-white rounded-xl shadow border border-gray-200 overflow-hidden"
+            >
+              <table class="w-full text-left border-collapse">
+                <thead
+                  class="bg-gray-50 text-gray-500 uppercase text-xs font-bold border-b border-gray-200"
+                >
+                  <tr>
+                    <th class="p-4 w-10 text-center">
+                      <input
+                        type="checkbox"
+                        id="selectAll"
+                        onchange="admin.toggleSelectAll()"
+                        class="w-4 h-4 rounded text-teal-600 focus:ring-teal-500"
+                      />
+                    </th>
+                    <th class="p-4">Mã / Thời gian</th>
+                    <th class="p-4">Thông tin</th>
+                    <th class="p-4">Loại</th>
+                    <th class="p-4 text-center">Trạng thái Selenium</th>
+                    <th class="p-4 text-center">Điểm TB</th>
+                    <th class="p-4 text-right">Thao tác</th>
+                  </tr>
+                </thead>
+                <tbody
+                  id="adminTableBody"
+                  class="text-sm divide-y divide-gray-100"
+                ></tbody>
+              </table>
+              <div
+                id="empty-state"
+                class="hidden flex flex-col items-center justify-center py-16 text-center"
+              >
+                <i class="fas fa-inbox text-4xl text-gray-300 mb-3"></i>
+                <p class="text-gray-500">Không có dữ liệu.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </main>
+    </div>
+
+    <!-- CÁC MODAL (Giữ nguyên như cũ) -->
+    <!-- Session Config Modal -->
+    <div
+      id="sessionModal"
+      class="fixed inset-0 bg-gray-900 bg-opacity-70 hidden z-[90] flex items-center justify-center p-4 backdrop-blur-sm"
+    >
+      <div
+        class="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-md border-t-4 border-teal-600"
+      >
+        <h3 class="text-xl font-bold text-teal-800 mb-2">
+          Cấu Hình Phiên Làm Việc
+        </h3>
+        <p class="text-sm text-gray-500 mb-6">
+          Thiết lập các thông tin dùng chung cho tất cả các phiếu trong phiên
+          này. (Chỉ Admin thấy)
+        </p>
+        <div class="space-y-4">
+          <div>
+            <label class="block text-sm font-medium mb-1"
+              >3. Người phỏng vấn / điền phiếu
+              <span class="text-red-500">*</span></label
+            >
+            <select
+              id="session-interviewer"
+              class="w-full border border-gray-300 p-2.5 rounded-lg focus:ring-2 focus:ring-teal-500 outline-none bg-white"
+            >
+              <option value="">-- Chọn --</option>
+              <option value="1. a. Người bệnh tự điền (hoặc người nhà)">
+                1. a. Người bệnh tự điền (hoặc người nhà)
+              </option>
+              <option value="2. b. Nhân viên của bệnh viện">
+                2. b. Nhân viên của bệnh viện
+              </option>
+              <option value="3. c. Bộ Y tế, Sở Y tế hoặc đoàn giám sát">
+                3. c. Bộ Y tế, Sở Y tế hoặc đoàn giám sát
+              </option>
+              <option value="4. d. Tổ chức độc lập">
+                4. d. Tổ chức độc lập
+              </option>
+              <option value="5. e. Đối tượng khác">5. e. Đối tượng khác</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-sm font-medium mb-1"
+              >4. Người trả lời <span class="text-red-500">*</span></label
+            >
+            <select
+              id="session-respondent"
+              class="w-full border border-gray-300 p-2.5 rounded-lg focus:ring-2 focus:ring-teal-500 outline-none bg-white"
+            >
+              <option value="">-- Chọn đối tượng --</option>
+              <option value="Người bệnh">Người bệnh</option>
+              <option value="Người nhà">Người nhà người bệnh</option>
+            </select>
+          </div>
+        </div>
+        <div class="mt-8 flex gap-3">
+          <button
+            onclick="
+              document.getElementById('sessionModal').classList.add('hidden')
+            "
+            class="flex-1 px-4 py-2.5 bg-gray-100 text-gray-600 font-medium rounded-lg hover:bg-gray-200 transition"
+          >
+            Đóng
+          </button>
+          <button
+            onclick="admin.saveSessionConfig()"
+            class="flex-1 px-4 py-2.5 bg-teal-600 text-white font-bold rounded-lg hover:bg-teal-700 transition shadow-lg"
+          >
+            Lưu Thiết Lập
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Edit Record Modal -->
+    <div
+      id="editRecordModal"
+      class="fixed inset-0 bg-gray-900 bg-opacity-75 hidden z-[80] flex items-center justify-center p-4 backdrop-blur-sm"
+    >
+      <div
+        class="bg-white rounded-xl shadow-2xl w-full max-w-4xl h-[90vh] flex flex-col"
+      >
+        <div
+          class="flex justify-between items-center p-6 border-b bg-gray-50 rounded-t-xl"
+        >
+          <div>
+            <h3 class="font-bold text-xl text-gray-800">
+              Chi tiết & Sửa Phiếu
+            </h3>
+            <p class="text-sm text-gray-500">
+              Mã phiếu:
+              <span
+                id="edit-id-display"
+                class="font-mono font-bold text-teal-600"
+                >...</span
+              >
+            </p>
+          </div>
+          <button
+            onclick="
+              document.getElementById('editRecordModal').classList.add('hidden')
+            "
+            class="text-gray-400 hover:text-gray-600 text-2xl"
+          >
+            &times;
+          </button>
+        </div>
+        <div
+          class="flex-1 overflow-y-auto p-6 bg-gray-50"
+          id="edit-form-container"
+        >
+          <!-- Admin Form Rendered Here -->
+        </div>
+        <div
+          class="p-4 border-t bg-white rounded-b-xl flex justify-between items-center"
+        >
+          <div class="text-xs text-gray-500 italic">
+            <span
+              class="inline-block w-3 h-3 bg-red-100 border border-red-500 mr-1 rounded"
+            ></span>
+            Điểm thấp (≤ 3)
+          </div>
+          <div class="flex gap-3">
+            <button
+              onclick="
+                document
+                  .getElementById('editRecordModal')
+                  .classList.add('hidden')
+              "
+              class="px-6 py-2 bg-gray-100 text-gray-700 font-bold rounded-lg hover:bg-gray-200"
+            >
+              Hủy
+            </button>
+            <button
+              onclick="admin.saveSingleEdit()"
+              class="px-6 py-2 bg-teal-600 text-white font-bold rounded-lg hover:bg-teal-700 shadow-lg"
+            >
+              Cập nhật Phiếu
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Login Modal -->
+    <div
+      id="loginModal"
+      class="fixed inset-0 bg-black bg-opacity-40 hidden flex items-center justify-center z-50"
+    >
+      <div class="bg-white w-full max-w-md rounded-2xl p-6 shadow-xl">
+        <h2 class="text-2xl font-bold text-center mb-6">Quản Trị Viên</h2>
+
+        <form onsubmit="admin.handleLogin(event)" class="space-y-4">
+          <div>
+            <label class="block text-sm font-medium text-gray-600"
+              >Tài khoản</label
+            >
+            <input
+              id="username"
+              type="text"
+              autocomplete="off"
+              class="w-full border p-2 rounded focus:ring-2 focus:ring-teal-500 outline-none"
+            />
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium text-gray-600"
+              >Mật khẩu</label
+            >
+            <input
+              id="password"
+              type="password"
+              autocomplete="new-password"
+              class="w-full border p-2 rounded focus:ring-2 focus:ring-teal-500 outline-none"
+            />
+          </div>
+
+          <div class="flex items-center space-x-2">
+            <input
+              type="checkbox"
+              id="rememberLogin"
+              class="h-4 w-4 text-teal-600"
+            />
+            <label for="rememberLogin" class="text-sm text-gray-600">
+              Ghi nhớ đăng nhập trên thiết bị này
+            </label>
+          </div>
+
+          <div id="loginError" class="hidden text-red-500 text-sm">
+            Sai tài khoản hoặc mật khẩu
+          </div>
+
+          <button
+            type="submit"
+            class="w-full bg-teal-600 text-white py-2 rounded hover:bg-teal-700 transition"
+          >
+            Đăng nhập
+          </button>
+
+          <button
+            type="button"
+            onclick="admin.closeLogin()"
+            class="w-full text-gray-500 text-sm mt-2"
+          >
+            Quay lại
+          </button>
+        </form>
+      </div>
+    </div>
+
+    <!-- Config Modal -->
+    <div
+      id="configModal"
+      class="fixed inset-0 bg-gray-900 bg-opacity-50 hidden z-[70] flex items-center justify-center p-4"
+    >
+      <div class="bg-white rounded-xl shadow-xl w-full max-w-md p-6">
+        <h3 class="font-bold text-lg mb-4">Cấu hình Google Sheets</h3>
+        <p class="text-sm text-gray-600 mb-2">
+          Nhập URL Web App từ Google Apps Script:
+        </p>
+        <input
+          type="text"
+          id="scriptUrlInput"
+          class="w-full border p-2 rounded mb-4 text-sm font-mono"
+          placeholder="https://script.google.com/..."
+        />
+        <div class="flex justify-end gap-2">
+          <button
+            onclick="
+              document.getElementById('configModal').classList.add('hidden')
+            "
+            class="px-4 py-2 bg-gray-100 rounded"
+          >
+            Đóng
+          </button>
+          <button
+            onclick="admin.saveConfig()"
+            class="px-4 py-2 bg-teal-600 text-white rounded"
+          >
+            Lưu
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Bulk Edit Modal -->
+    <div
+      id="bulkEditModal"
+      class="fixed inset-0 bg-gray-900 bg-opacity-50 hidden z-[70] flex items-center justify-center p-4"
+    >
+      <div class="bg-white rounded-xl shadow-xl w-full max-w-md p-6">
+        <h3 class="font-bold text-lg mb-4">Sửa Điểm Hàng Loạt</h3>
+        <p class="text-sm text-gray-500 mb-4">
+          Đang chọn:
+          <span id="bulk-edit-count" class="font-bold text-teal-600">0</span>
+          phiếu.
+        </p>
+        <div class="mb-4">
+          <label class="block text-sm font-medium mb-1"
+            >Chọn Nhóm Câu Hỏi</label
+          >
+          <select
+            id="bulk-section"
+            class="w-full border p-2 rounded bg-gray-50"
+          >
+            <option value="all">Toàn bộ (A - E)</option>
+            <option value="A">Nhóm A</option>
+            <option value="B">Nhóm B</option>
+            <option value="C">Nhóm C</option>
+            <option value="D">Nhóm D</option>
+            <option value="E">Nhóm E</option>
+          </select>
+        </div>
+        <div class="flex gap-2 mb-6">
+          <button
+            onclick="admin.setBulkScore(1)"
+            class="flex-1 py-2 border rounded hover:bg-red-50 text-red-600 font-bold bulk-btn transition"
+            data-v="1"
+          >
+            1
+          </button>
+          <button
+            onclick="admin.setBulkScore(2)"
+            class="flex-1 py-2 border rounded hover:bg-orange-50 text-orange-600 font-bold bulk-btn transition"
+            data-v="2"
+          >
+            2
+          </button>
+          <button
+            onclick="admin.setBulkScore(3)"
+            class="flex-1 py-2 border rounded hover:bg-yellow-50 text-yellow-600 font-bold bulk-btn transition"
+            data-v="3"
+          >
+            3
+          </button>
+          <button
+            onclick="admin.setBulkScore(4)"
+            class="flex-1 py-2 border rounded hover:bg-blue-50 text-blue-600 font-bold bulk-btn transition"
+            data-v="4"
+          >
+            4
+          </button>
+          <button
+            onclick="admin.setBulkScore(5)"
+            class="flex-1 py-2 border rounded hover:bg-green-50 text-green-600 font-bold bulk-btn transition"
+            data-v="5"
+          >
+            5
+          </button>
+        </div>
+        <input type="hidden" id="bulk-score-val" value="5" />
+        <div class="flex justify-end gap-2">
+          <button
+            onclick="
+              document.getElementById('bulkEditModal').classList.add('hidden')
+            "
+            class="px-4 py-2 bg-gray-100 rounded hover:bg-gray-200"
+          >
+            Hủy
+          </button>
+          <button
+            onclick="admin.applyBulkEdit()"
+            class="px-4 py-2 bg-teal-600 text-white font-bold rounded hover:bg-teal-700 shadow"
+          >
+            Áp dụng
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div
+      id="toast"
+      class="fixed top-5 right-5 z-[80] transform translate-x-full transition-transform duration-300 bg-white border-l-4 border-teal-500 shadow-xl rounded-lg p-4"
+    >
+      <h4 class="font-bold text-gray-800 text-sm" id="toast-title">
+        Thành công
+      </h4>
+      <p class="text-gray-500 text-xs" id="toast-msg">Đã lưu dữ liệu.</p>
+    </div>
+
+    <script src="app.js"></script>
+    <script src="admin.js"></script>
+  </body>
+</html>

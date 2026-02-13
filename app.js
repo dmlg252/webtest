@@ -1,0 +1,1579 @@
+// ========================================
+// CONFIGURATION & GLOBAL VARIABLES
+// ========================================
+const DEFAULT_HOSPITAL = "Bệnh viện Phụ Sản Hải Phòng";
+const DEFAULT_SCRIPT_URL =
+  "https://script.google.com/macros/s/AKfycbyVjQq7Z3nPpRKs7ShzVWm1y63_yJ7Cyna3G9bF5GlcaB_wJg_A39OHwRQWieNqG_hw/exec";
+
+let APPS_SCRIPT_URL =
+  localStorage.getItem("BYT_SCRIPT_URL") || DEFAULT_SCRIPT_URL;
+let SESSION_CONFIG = JSON.parse(
+  localStorage.getItem("BYT_SESSION_CONFIG") || "null",
+);
+
+// ========================================
+// DATA STRUCTURES
+// ========================================
+
+// Footer chung cho mẫu 1 và 2
+const commonPatientFooter = [
+  {
+    id: "G1",
+    label:
+      "G1. Đánh giá chung, bệnh viện đã đáp ứng được bao nhiêu % so với mong đợi của Ông/Bà trước khi nằm viện/tới khám? (0-100)",
+    type: "number",
+    required: true,
+    suffix: "%",
+  },
+  {
+    id: "G2",
+    label:
+      "G2. Nếu có nhu cầu khám, chữa những bệnh, Ông/Bà có quay trở lại hoặc giới thiệu cho người khác đến không?",
+    type: "select",
+    required: true,
+    options: [
+      "1. Chắc chắn không bao giờ quay lại",
+      "2. Không muốn quay lại nhưng có ít lựa chọn khác",
+      "3. Muốn chuyển sang bệnh viện khác",
+      "4. Có thể sẽ quay lại",
+      "5. Chắc chắn sẽ quay lại hoặc giới thiệu cho người khác",
+      "6. Khác",
+    ],
+  },
+  {
+    id: "H1",
+    label:
+      "H1. Đối với các câu hỏi có ý kiến chưa hài lòng, đề nghị Ông/Bà ghi rõ thêm lý do tại sao không hài lòng?",
+    type: "textarea",
+  },
+  {
+    id: "H2",
+    label:
+      "H2. Ông/Bà có ý kiến hoặc nhận xét gì khác giúp bệnh viện và hệ thống khám, chữa bệnh phục vụ người bệnh được tốt hơn, xin ghi rõ?",
+    type: "textarea",
+  },
+];
+
+// Mẫu 1: Nội trú
+const form1Structure = {
+  id: "form1",
+  title: "Nội Trú (Mẫu 01)",
+  demographics: [
+    {
+      id: "a1_gender",
+      label: "A1. Giới tính",
+      type: "radio",
+      options: ["1. Nam", "2. Nữ", "3. Khác"],
+      required: true,
+      width: "half",
+    },
+    {
+      id: "a2_age",
+      label: "A2. Tuổi hoặc năm sinh",
+      type: "number",
+      required: true,
+      width: "half",
+    },
+    {
+      id: "a3_phone",
+      label: "A3. Số di động",
+      type: "tel",
+      required: false,
+      width: "half",
+    },
+    {
+      id: "a4_days",
+      label: "A4. Số ngày nằm viện",
+      type: "number",
+      required: true,
+      width: "half",
+    },
+    {
+      id: "a5_bhyt",
+      label: "A5. Ông/Bà có sử dụng thẻ BHYT cho lần điều trị này không?",
+      type: "radio",
+      options: ["1. Có", "2. Không"],
+      required: true,
+      width: "full",
+    },
+    {
+      id: "a6_place",
+      label: "A6. Nơi sinh sống hiện nay",
+      type: "select",
+      options: ["1. Thành thị", "2. Nông thôn", "3. Vùng sâu, xa khó khăn"],
+      required: true,
+      width: "half",
+    },
+    {
+      id: "a7_economy",
+      label: "A7. Phân loại mức sống của gia đình",
+      type: "select",
+      options: ["1. Nghèo", "2. Cận nghèo", "3. Khác"],
+      required: true,
+      width: "half",
+    },
+    {
+      id: "a8_times",
+      label:
+        "A8. Đây là lần điều trị thứ mấy của Ông/Bà tại bệnh viện? Lần thứ:",
+      type: "number",
+      required: true,
+      width: "full",
+    },
+  ],
+  sections: [
+    {
+      title: "A. Khả năng tiếp cận",
+      questions: [
+        {
+          id: "S_A1",
+          text: "Di chuyển, thông tin, sơ đồ, biển báo (A1, A2, A3, A5)",
+          required: true,
+          mapToHeaders: [
+            "A1. Các sơ đồ, biển báo chỉ dẫn đường đến các khoa, phòng và thông báo giờ khám, chữa bệnh, giờ vào thăm rõ ràng, dễ hiểu",
+            "A2. Các tòa nhà, cầu thang bộ, thang máy, buồng bệnh được đánh số và hướng dẫn rõ ràng, dễ tìm",
+            "A3. Các lối đi trong bệnh viện, hành lang bằng phẳng, an toàn, dễ đi",
+            "A5. Người bệnh hỏi và gọi được nhân viên y tế khi cần thiết",
+          ],
+        },
+        {
+          id: "S_A2",
+          text: "Chờ đợi thang máy/thủ tục (A4)",
+          required: true,
+          mapToHeaders: [
+            "A4. Thời gian chờ đợi thang máy, làm thủ tục và chờ đợi trong quá trình khám, chữa bệnh chấp nhận được",
+          ],
+        },
+      ],
+    },
+    {
+      title: "B. Sự minh bạch thông tin",
+      questions: [
+        {
+          id: "S_B1",
+          text: "Quy trình, hướng dẫn, giải thích (B1, B3, B4, B5, B6)",
+          required: true,
+          mapToHeaders: [
+            "B1. Quy trình, thủ tục hành chính (nhập, xuất viện, chuyển viện, chuyển khoa…) rõ ràng, công khai, thuận tiện",
+            "B3. Quy trình, thời gian làm thủ tục thanh toán viện phí khi ra viện rõ ràng, công khai, thuận tiện",
+            "B4. Được phổ biến về nội quy và những thông tin cần thiết khi nằm viện rõ ràng, đầy đủ",
+            "B5. Được giải thích về tình trạng bệnh, phương pháp và thời gian dự kiến điều trị rõ ràng, đầy đủ",
+            "B6. Được giải thích, tư vấn trước khi yêu cầu làm các xét nghiệm, thăm dò, kỹ thuật cao rõ ràng, đầy đủ",
+          ],
+        },
+        {
+          id: "S_B2",
+          text: "Giá cả công khai, thuốc, chi phí (B2, B7)",
+          required: true,
+          mapToHeaders: [
+            "B2. Giá dịch vụ y tế được niêm yết, thông báo công khai ở vị trí dễ quan sát, dễ đọc, dễ hiểu và được tư vấn, giải thích các chi phí cao nếu có",
+            "B7. Được công khai và cập nhật thông tin về dùng thuốc và chi phí điều trị",
+          ],
+        },
+      ],
+    },
+    {
+      title: "C. Cơ sở vật chất",
+      questions: [
+        {
+          id: "S_C1",
+          text: "Buồng bệnh, vệ sinh, phương tiện (C1, C3-C7, C11)",
+          required: true,
+          mapToHeaders: [
+            "C1. Buồng bệnh khang trang, sạch sẽ, có đầy đủ các thiết bị điều chỉnh nhiệt độ phù hợp như quạt, máy sưởi, hoặc điều hòa",
+            "C3. Giường bệnh, ga, gối đầy đủ cho mỗi người một giường, chắc chắn, sử dụng tốt",
+            "C4. Được cung cấp quần áo đầy đủ, sạch sẽ",
+            "C5. Nhà vệ sinh, nhà tắm thuận tiện, sạch sẽ, sử dụng tốt",
+            "C6. Được cung cấp đầy đủ nước uống nóng, lạnh ngay tại khoa điều trị",
+            "C7. Người bệnh và người nhà người bệnh truy cập được mạng internet không dây (wifi) ngay tại buồng bệnh",
+            "C11. Được cung cấp phương tiện vận chuyển nội viện như xe lăn, cáng, xe điện đầy đủ, kịp thời, sử dụng tốt khi có nhu cầu",
+          ],
+        },
+        {
+          id: "S_C2",
+          text: "An ninh, riêng tư (C2, C8)",
+          required: true,
+          mapToHeaders: [
+            "C2. Buồng bệnh yên tĩnh, bảo đảm an toàn, an ninh, trật tự, phòng ngừa trộm cắp, yên tâm khi nằm viện",
+            "C8. Được bảo đảm sự riêng tư khi nằm viện như thay quần áo, khám bệnh, đi vệ sinh tại giường… có rèm che, vách ngăn hoặc nằm riêng",
+          ],
+        },
+        {
+          id: "S_C3",
+          text: "Khuôn viên, Căng-tin (C9, C10)",
+          required: true,
+          mapToHeaders: [
+            "C9. Căng-tin bệnh viện phục vụ ăn uống và nhu cầu sinh hoạt thiết yếu đầy đủ và chất lượng",
+            "C10. Môi trường trong khuôn viên bệnh viện xanh, sạch, đẹp",
+          ],
+        },
+      ],
+    },
+    {
+      title: "D. Thái độ NVYT",
+      questions: [
+        {
+          id: "S_D1",
+          text: "Giao tiếp, thái độ, không vòi vĩnh (D1, D2, D3, D7)",
+          required: true,
+          mapToHeaders: [
+            "D1. Bác sỹ, điều dưỡng có lời nói, thái độ, giao tiếp đúng mực",
+            "D2. Nhân viên phục vụ (hộ lý, bảo vệ, kế toán…) có lời nói, thái độ, giao tiếp đúng mực",
+            "D3. Được nhân viên y tế tôn trọng, đối xử công bằng, quan tâm, giúp đỡ",
+            "D7. Không bị nhân viên y tế gợi ý bồi dưỡng",
+          ],
+        },
+        {
+          id: "S_D2",
+          text: "Chuyên môn, thăm khám (D4, D5, D6)",
+          required: true,
+          mapToHeaders: [
+            "D4. Bác sỹ, điều dưỡng hợp tác tốt và xử lý công việc thành thạo, kịp thời",
+            "D5. Được bác sỹ thăm khám, động viên tại phòng điều trị",
+            "D6. Được tư vấn chế độ ăn, vận động, theo dõi và phòng ngừa biến chứng",
+          ],
+        },
+      ],
+    },
+    {
+      title: "E. Kết quả",
+      questions: [
+        {
+          id: "S_E1",
+          text: "Kết quả điều trị, chờ đợi, vật tư (E1-E5)",
+          required: true,
+          mapToHeaders: [
+            "E1. Thời gian chờ đợi khi khám, chữa bệnh tại bệnh viện",
+            "E2. Được cấp phát cho dùng thuốc đúng giờ, hướng dẫn sử dụng thuốc đầy đủ và các tác dụng phụ nếu có",
+            "E3. Được nhắc lịch tái khám và hướng dẫn thực hành ăn uống, luyện tập, chăm sóc tại nhà trước khi ra viện",
+            "E4. Trang thiết bị, vật tư y tế đầy đủ, hiện đại, đáp ứng nhu cầu khám chữa bệnh",
+            "E5. Kết quả điều trị đáp ứng được nguyện vọng",
+          ],
+        },
+        {
+          id: "S_E2",
+          text: "Tin tưởng chất lượng (E6)",
+          required: true,
+          mapToHeaders: [
+            "E6. Ông/Bà đánh giá mức độ tin tưởng về chất lượng dịch vụ y tế",
+          ],
+        },
+        {
+          id: "S_E3",
+          text: "Chi phí tương xứng (E7)",
+          required: true,
+          isCost: true,
+          mapToHeaders: [
+            "E7. Ông/Bà cho nhận xét về số tiền chi trả có tương xứng với chất lượng dịch vụ y tế không?",
+          ],
+        },
+      ],
+    },
+  ],
+  footer: commonPatientFooter,
+};
+
+// Mẫu 2: Ngoại trú
+const form2Structure = {
+  id: "form2",
+  title: "Ngoại Trú (Mẫu 02)",
+  demographics: [
+    {
+      id: "a1_gender",
+      label: "A1. Giới tính",
+      type: "radio",
+      options: ["1. Nam", "2. Nữ", "3. Khác"],
+      required: true,
+      width: "half",
+    },
+    {
+      id: "a2_age",
+      label: "A2. Tuổi hoặc năm sinh",
+      type: "number",
+      required: true,
+      width: "half",
+    },
+    {
+      id: "a3_phone",
+      label: "A3. Số di động",
+      type: "tel",
+      required: false,
+      width: "half",
+    },
+    {
+      id: "a4_distance",
+      label: "A4. Ước tính khoảng cách từ nơi sinh sống đến bệnh viện (km)",
+      type: "number",
+      required: true,
+      width: "half",
+    },
+    {
+      id: "a5_bhyt",
+      label: "A5. Ông/Bà có sử dụng thẻ BHYT cho lần khám bệnh này không?",
+      type: "radio",
+      options: ["1. Có", "2. Không"],
+      required: true,
+      width: "full",
+    },
+    {
+      id: "a6_place",
+      label: "A6. Nơi sinh sống hiện nay",
+      type: "select",
+      options: ["1. Thành thị", "2. Nông thôn", "3. Vùng sâu, xa khó khăn"],
+      required: true,
+      width: "half",
+    },
+    {
+      id: "a7_economy",
+      label: "A7. Phân loại mức sống của gia đình",
+      type: "select",
+      options: ["1. Nghèo", "2. Cận nghèo", "3. Khác"],
+      required: true,
+      width: "half",
+    },
+    {
+      id: "a8_times",
+      label:
+        "A8. Đây là lần điều trị thứ mấy của Ông/Bà tại bệnh viện? Lần thứ:",
+      type: "number",
+      required: true,
+      width: "full",
+    },
+  ],
+  sections: [
+    {
+      title: "A. Khả năng tiếp cận",
+      questions: [
+        {
+          id: "S_A1",
+          text: "Biển báo, sơ đồ, lối đi, đăng ký (A1-A5)",
+          required: true,
+          mapToHeaders: [
+            "A1. Các biển báo, chỉ dẫn đường đến bệnh viện rõ ràng, dễ nhìn, dễ tìm",
+            "A2. Các sơ đồ, biển báo chỉ dẫn đường đến các khoa, phòng trong bệnh viện rõ ràng, dễ hiểu, dễ tìm",
+            "A3. Các khối nhà, cầu thang được đánh số rõ ràng, dễ tìm",
+            "A4. Các lối đi trong bệnh viện, hành lang bằng phẳng, dễ đi",
+            "A5. Có thể tìm hiểu các thông tin và đăng ký khám qua điện thoại, trang tin điện tử của bệnh viện (website) thuận tiện",
+          ],
+        },
+      ],
+    },
+    {
+      title: "B. Minh bạch & Thủ tục",
+      questions: [
+        {
+          id: "S_B1",
+          text: "Quy trình, giá niêm yết (B1, B2, B3)",
+          required: true,
+          mapToHeaders: [
+            "B1. Quy trình khám bệnh được niêm yết rõ ràng, công khai, dễ hiểu",
+            "B2. Các quy trình, thủ tục khám bệnh được cải cách đơn giản, thuận tiện",
+            "B3. Giá dịch vụ y tế niêm yết rõ ràng, công khai",
+          ],
+        },
+        {
+          id: "S_B2",
+          text: "Tiếp đón, xếp hàng (B4, B5)",
+          required: true,
+          mapToHeaders: [
+            "B4. Nhân viên y tế tiếp đón, hướng dẫn người bệnh làm các thủ tục niềm nở, tận tình",
+            "B5. Được xếp hàng theo thứ tự trước sau khi làm các thủ tục đăng ký, nộp tiền, khám bệnh, xét nghiệm, chiếu chụp",
+          ],
+        },
+        {
+          id: "S_B3",
+          text: "Thời gian chờ đợi (B6-B10)",
+          required: true,
+          mapToHeaders: [
+            "B6. Đánh giá thời gian chờ đợi làm thủ tục đăng ký khám",
+            "B7. Đánh giá thời gian chờ tới lượt bác sỹ khám",
+            "B8. Đánh giá thời gian được bác sỹ khám và tư vấn",
+            "B9. Đánh giá thời gian chờ làm xét nghiệm, chiếu chụp",
+            "B10. Đánh giá thời gian chờ nhận kết quả xét nghiệm, chiếu chụp",
+          ],
+        },
+      ],
+    },
+    {
+      title: "C. Cơ sở vật chất",
+      questions: [
+        {
+          id: "S_C1",
+          text: "Phòng chờ, vệ sinh, tiện ích (C1-C4, C6)",
+          required: true,
+          mapToHeaders: [
+            "C1. Có phòng/sảnh chờ khám sạch sẽ, thoáng mát vào mùa hè; kín gió và ấm áp vào mùa đông",
+            "C2. Phòng chờ có đủ ghế ngồi cho người bệnh và sử dụng tốt",
+            "C3. Phòng chờ có quạt (điều hòa) đầy đủ, hoạt động thường xuyên",
+            "C4. Phòng chờ có các phương tiện giúp người bệnh có tâm lý thoải mái như ti-vi, tranh ảnh, tờ rơi, nước uống...",
+            "C6. Nhà vệ sinh thuận tiện, sử dụng tốt, sạch sẽ",
+          ],
+        },
+        {
+          id: "S_C2",
+          text: "Riêng tư, an ninh (C5, C8)",
+          required: true,
+          mapToHeaders: [
+            "C5. Được bảo đảm sự riêng tư khi khám bệnh, chiếu chụp, làm thủ thuật",
+            "C8. Khu khám bệnh bảo đảm an ninh, trật tự, phòng ngừa trộm cắp cho người dân",
+          ],
+        },
+        {
+          id: "S_C3",
+          text: "Khuôn viên (C7)",
+          required: true,
+          mapToHeaders: [
+            "C7. Môi trường trong khuôn viên bệnh viện xanh, sạch, đẹp",
+          ],
+        },
+      ],
+    },
+    {
+      title: "D. Thái độ NVYT",
+      questions: [
+        {
+          id: "S_D1",
+          text: "Giao tiếp, tôn trọng (D1, D2, D3)",
+          required: true,
+          mapToHeaders: [
+            "D1. Nhân viên y tế (bác sỹ, điều dưỡng) có lời nói, thái độ, giao tiếp đúng mực",
+            "D2. Nhân viên phục vụ (hộ lý, bảo vệ, kế toán…) có lời nói, thái độ, giao tiếp đúng mực",
+            "D3. Được nhân viên y tế tôn trọng, đối xử công bằng, quan tâm, giúp đỡ",
+          ],
+        },
+        {
+          id: "S_D2",
+          text: "Chuyên môn (D4)",
+          required: true,
+          mapToHeaders: [
+            "D4. Năng lực chuyên môn của bác sỹ, điều dưỡng đáp ứng mong đợi",
+          ],
+        },
+      ],
+    },
+    {
+      title: "E. Kết quả",
+      questions: [
+        {
+          id: "S_E1",
+          text: "Kết quả, hóa đơn minh bạch (E1, E2)",
+          required: true,
+          mapToHeaders: [
+            "E1. Kết quả khám bệnh đã đáp ứng được nguyện vọng của Ông/Bà",
+            "E2. Các hóa đơn, phiếu thu, đơn thuốc và kết quả khám bệnh được cung cấp đầy đủ, rõ ràng, minh bạch và được giải thích nếu có thắc mắc",
+          ],
+        },
+        {
+          id: "S_E2",
+          text: "Tin tưởng, hài lòng giá (E3, E4)",
+          required: true,
+          mapToHeaders: [
+            "E3. Đánh giá mức độ tin tưởng về chất lượng dịch vụ y tế",
+            "E4. Đánh giá mức độ hài lòng về giá cả dịch vụ y tế",
+          ],
+        },
+        {
+          id: "S_E3",
+          text: "Chi phí tương xứng (E5)",
+          required: true,
+          isCost: true,
+          mapToHeaders: [
+            "E5. Ông/Bà cho nhận xét về số tiền chi trả có tương xứng với chất lượng dịch vụ y tế không?",
+          ],
+        },
+      ],
+    },
+  ],
+  footer: commonPatientFooter,
+};
+
+// Mẫu 3: Nhân viên
+const form3Structure = {
+  id: "form3",
+  title: "Nhân Viên (Mẫu 03)",
+  demographics: [
+    {
+      id: "khoa_phong",
+      label: "Khoa phòng của nhân viên",
+      type: "select",
+      required: false,
+      width: "full",
+      options: [
+        "Khoa Phụ",
+        "Khoa điều trị nội trú sản phụ khoa - Cơ sở Hùng Vương",
+        "Phòng khám đa khoa - Cơ sở Hùng Vương",
+        "Phòng Tổ chức cán bộ",
+        "Phòng Kế hoạch tổng hợp",
+        "Phòng Hành chính quản trị",
+        "Phòng Tài chính kế toán",
+        "Phòng Quản lý chất lượng",
+        "Phòng Điều dưỡng",
+        "Khoa Sản 1",
+        "Khoa Sơ Sinh",
+        "Khoa Sản 2",
+        "Khoa Sản 3",
+        "Khoa Phẫu Thuật Nội Soi",
+        "Khoa Phụ 1",
+        "Khoa Phụ 2",
+        "Khoa Kế hoạch hóa gia đình",
+        "Khoa Quản lý thai nghé và Chẩn đoán trước sinh",
+        "Khoa Chẩn đoán hình ảnh",
+        "Khoa Hỗ trợ sinh sản",
+        "Khoa Khám bệnh",
+        "Khoa Dược",
+        "Khoa Kiểm soát nhiễm khuẩn",
+        "Khoa Đỡ Đẻ",
+        "Khối Xét nghiệm",
+        "Khoa GMHS",
+      ],
+    },
+    {
+      id: "a1_gender",
+      label: "A1. Giới tính",
+      type: "radio",
+      options: ["1. Nam", "2. Nữ", "3. Khác"],
+      required: true,
+      width: "half",
+    },
+    {
+      id: "a2_age",
+      label: "A2. Tuổi",
+      type: "number",
+      required: true,
+      width: "half",
+    },
+    {
+      id: "a3_job",
+      label: "A3. Chuyên môn đào tạo chính",
+      type: "select",
+      options: [
+        "1. Bác sỹ",
+        "2. Dược sỹ",
+        "3. Điều dưỡng, hộ sinh",
+        "4. Kỹ thuật viên",
+        "5. Khác",
+      ],
+      required: true,
+      width: "full",
+    },
+    {
+      id: "a4_degree",
+      label: "A4. Bằng cấp cao nhất của Ông/Bà",
+      type: "select",
+      options: [
+        "1. Trung cấp",
+        "2. Cao đẳng",
+        "3. Đại học",
+        "4. Cao học, CKI",
+        "5. Tiến sỹ, CKII",
+        "6. Khác",
+      ],
+      required: true,
+      width: "half",
+    },
+    {
+      id: "a5_exp_y",
+      label: "A5. Số năm công tác trong ngành Y",
+      type: "number",
+      required: true,
+      width: "half",
+    },
+    {
+      id: "a6_exp_bv",
+      label: "A6. Số năm công tác tại bệnh viện hiện nay",
+      type: "number",
+      required: true,
+      width: "half",
+    },
+    {
+      id: "a7_pos",
+      label: "A7. Vị trí công tác hiện tại",
+      type: "select",
+      options: [
+        "1. Lãnh đạo bệnh viện",
+        "2. Trưởng khoa/phòng/ trung tâm",
+        "3. Phó khoa/phòng",
+        "4. Điều dưỡng/Hộ sinh/KTV trưởng",
+        "5. NV biên chế/hợp đồng dài hạn",
+        "6. Hợp đồng ngắn hạn",
+        "7. Khác",
+      ],
+      required: true,
+      width: "half",
+    },
+    {
+      id: "a8_scope",
+      label: "A8. Phạm vi hoạt động chuyên môn",
+      type: "select",
+      options: [
+        "1. Khối hành chính",
+        "2. Cận lâm sàng",
+        "3. Nội",
+        "4. Ngoại",
+        "5. Sản",
+        "6. Nhi",
+        "7. Truyền nhiễm",
+        "8. Chuyên khoa lẻ (mắt, TMH, RHM…)",
+        "9. Các khoa không trực tiếp KCB",
+        "10. Dược",
+        "11. Dự phòng",
+        "12. Khác",
+      ],
+      required: true,
+      width: "full",
+    },
+    {
+      id: "a9_multi",
+      label: "A9. Anh/Chị có được phân công kiêm nhiệm nhiều công việc không?",
+      type: "radio",
+      options: [
+        "1. Không kiêm nhiệm",
+        "2. Kiêm nhiệm 2 công việc",
+        "3. Kiêm nhiệm từ 3 công việc trở lên",
+      ],
+      required: true,
+      width: "half",
+    },
+    {
+      id: "a10_shift",
+      label: "A10. Trung bình Anh/Chị trực mấy lần trong một tháng?",
+      type: "number",
+      required: true,
+      width: "half",
+    },
+  ],
+  sections: [
+    {
+      title: "A. Sự hài lòng về môi trường làm việc",
+      questions: [
+        {
+          id: "A1",
+          text: "A1. Phòng làm việc khang trang, sạch sẽ, thoáng mát",
+          required: true,
+          mapToHeaders: ["A1. Phòng làm việc khang trang, sạch sẽ, thoáng mát"],
+        },
+        {
+          id: "A2",
+          text: "A2. Trang thiết bị văn phòng, bàn ghế làm việc... đầy đủ, các thiết bị cũ, lạc hậu được thay thế kịp thời",
+          required: true,
+          mapToHeaders: [
+            "A2. Trang thiết bị văn phòng, bàn ghế làm việc... đầy đủ, các thiết bị cũ, lạc hậu được thay thế kịp thời",
+          ],
+        },
+        {
+          id: "A3",
+          text: "A3. Có bố trí phòng trực cho NVYT",
+          required: true,
+          mapToHeaders: ["A3. Có bố trí phòng trực cho NVYT"],
+        },
+        {
+          id: "A4",
+          text: "A4. Phân chia thời gian trực và làm việc ngoài giờ hành chính hợp lý",
+          required: true,
+          mapToHeaders: [
+            "A4. Phân chia thời gian trực và làm việc ngoài giờ hành chính hợp lý",
+          ],
+        },
+        {
+          id: "A5",
+          text: "A5. Các trang bị bảo hộ cho NVYT (quần áo, khẩu trang, găng tay..) đầy đủ, không bị cũ, nhàu nát, không bị hạn chế sử dụng",
+          required: true,
+          mapToHeaders: [
+            "A5. Các trang bị bảo hộ cho NVYT (quần áo, khẩu trang, găng tay..) đầy đủ, không bị cũ, nhàu nát, không bị hạn chế sử dụng",
+          ],
+        },
+        {
+          id: "A6",
+          text: "A6. Môi trường học tập tạo điều kiện cho NVYT cập nhật kiến thức, nâng cao trình độ: thư viện, phòng đọc, tra cứu thông tin, truy cập internet...",
+          required: true,
+          mapToHeaders: [
+            "A6. Môi trường học tập tạo điều kiện cho NVYT cập nhật kiến thức, nâng cao trình độ: thư viện, phòng đọc, tra cứu thông tin, truy cập internet...",
+          ],
+        },
+        {
+          id: "A7",
+          text: "A7. Môi trường làm việc bảo đảm an toàn cho NVYT",
+          required: true,
+          mapToHeaders: ["A7. Môi trường làm việc bảo đảm an toàn cho NVYT"],
+        },
+        {
+          id: "A8",
+          text: "A8. Bệnh viện bảo đảm an ninh, trật tự cho NVYT làm việc",
+          required: true,
+          mapToHeaders: [
+            "A8. Bệnh viện bảo đảm an ninh, trật tự cho NVYT làm việc",
+          ],
+        },
+        {
+          id: "A9",
+          text: "A9. Người bệnh và người nhà có thái độ tôn trọng, hợp tác với NVYT trong quá trình điều trị",
+          required: true,
+          mapToHeaders: [
+            "A9. Người bệnh và người nhà có thái độ tôn trọng, hợp tác với NVYT trong quá trình điều trị",
+          ],
+        },
+      ],
+    },
+    {
+      title: "B. Sự hài lòng về lãnh đạo trực tiếp, đồng nghiệp",
+      questions: [
+        {
+          id: "B1",
+          text: "B1. Lãnh đạo có năng lực xử lý, điều hành, giải quyết công việc hiệu quả",
+          required: true,
+          mapToHeaders: [
+            "B1. Lãnh đạo có năng lực xử lý, điều hành, giải quyết công việc hiệu quả",
+          ],
+        },
+        {
+          id: "B2",
+          text: "B2. Lãnh đạo phân công công việc phù hợp với chuyên môn đào tạo của nhân viên",
+          required: true,
+          mapToHeaders: [
+            "B2. Lãnh đạo phân công công việc phù hợp với chuyên môn đào tạo của nhân viên",
+          ],
+        },
+        {
+          id: "B3",
+          text: "B3. Lãnh đạo quan tâm, tôn trọng, đối xử bình đẳng với các NVYT",
+          required: true,
+          mapToHeaders: [
+            "B3. Lãnh đạo quan tâm, tôn trọng, đối xử bình đẳng với các NVYT",
+          ],
+        },
+        {
+          id: "B4",
+          text: "B4. Lãnh đạo lắng nghe và tiếp thu ý kiến đóng góp NVYT",
+          required: true,
+          mapToHeaders: [
+            "B4. Lãnh đạo lắng nghe và tiếp thu ý kiến đóng góp NVYT",
+          ],
+        },
+        {
+          id: "B5",
+          text: "B5. Lãnh đạo động viên, khích lệ nhân viên khi hoàn thành tốt nhiệm vụ, có tiến bộ trong công việc",
+          required: true,
+          mapToHeaders: [
+            "B5. Lãnh đạo động viên, khích lệ nhân viên khi hoàn thành tốt nhiệm vụ, có tiến bộ trong công việc",
+          ],
+        },
+        {
+          id: "B6",
+          text: "B6. Đồng nghiệp có ý thức hợp tác để hoàn thành nhiệm vụ chung",
+          required: true,
+          mapToHeaders: [
+            "B6. Đồng nghiệp có ý thức hợp tác để hoàn thành nhiệm vụ chung",
+          ],
+        },
+        {
+          id: "B7",
+          text: "B7. Môi trường làm việc thân thiện, đoàn kết",
+          required: true,
+          mapToHeaders: ["B7. Môi trường làm việc thân thiện, đoàn kết"],
+        },
+        {
+          id: "B8",
+          text: "B8. Đồng nghiệp chia sẻ kinh nghiệm, giúp đỡ nhau trong công việc",
+          required: true,
+          mapToHeaders: [
+            "B8. Đồng nghiệp chia sẻ kinh nghiệm, giúp đỡ nhau trong công việc",
+          ],
+        },
+        {
+          id: "B9",
+          text: "B9. Đồng nghiệp quan tâm, giúp đỡ nhau trong cuộc sống",
+          required: true,
+          mapToHeaders: [
+            "B9. Đồng nghiệp quan tâm, giúp đỡ nhau trong cuộc sống",
+          ],
+        },
+      ],
+    },
+    {
+      title: "C. Sự hài lòng về quy chế nội bộ, tiền lương, phúc lợi",
+      questions: [
+        {
+          id: "C1",
+          text: "C1. Các quy định, quy chế làm việc nội bộ của bệnh viện rõ ràng, thực tế và công khai",
+          required: true,
+          mapToHeaders: [
+            "C1. Các quy định, quy chế làm việc nội bộ của bệnh viện rõ ràng, thực tế và công khai",
+          ],
+        },
+        {
+          id: "C2",
+          text: "C2. Môi trường làm việc tại khoa/phòng và bệnh viện dân chủ",
+          required: true,
+          mapToHeaders: [
+            "C2. Môi trường làm việc tại khoa/phòng và bệnh viện dân chủ",
+          ],
+        },
+        {
+          id: "C3",
+          text: "C3. Quy chế chi tiêu nội bộ công bằng, hợp lý, công khai",
+          required: true,
+          mapToHeaders: [
+            "C3. Quy chế chi tiêu nội bộ công bằng, hợp lý, công khai",
+          ],
+        },
+        {
+          id: "C4",
+          text: "C4. Việc phân phối quỹ phúc lợi công bằng, công khai",
+          required: true,
+          mapToHeaders: [
+            "C4. Việc phân phối quỹ phúc lợi công bằng, công khai",
+          ],
+        },
+        {
+          id: "C5",
+          text: "C5. Mức lương tương xứng so với năng lực và cống hiến",
+          required: true,
+          mapToHeaders: [
+            "C5. Mức lương tương xứng so với năng lực và cống hiến",
+          ],
+        },
+        {
+          id: "C6",
+          text: "C6. Chế độ phụ cấp nghề và độc hại xứng đáng so với cống hiến",
+          required: true,
+          mapToHeaders: [
+            "C6. Chế độ phụ cấp nghề và độc hại xứng đáng so với cống hiến",
+          ],
+        },
+        {
+          id: "C7",
+          text: "C7. Thưởng và thu nhập tăng thêm ABC xứng đáng so với cống hiến",
+          required: true,
+          mapToHeaders: [
+            "C7. Thưởng và thu nhập tăng thêm ABC xứng đáng so với cống hiến",
+          ],
+        },
+        {
+          id: "C8",
+          text: "C8. Cách phân chia thu nhập tăng thêm công bằng, khuyến khích nhân viên làm việc tích cực",
+          required: true,
+          mapToHeaders: [
+            "C8. Cách phân chia thu nhập tăng thêm công bằng, khuyến khích nhân viên làm việc tích cực",
+          ],
+        },
+        {
+          id: "C9",
+          text: "C9. Bảo đảm đóng BHXH, BHYT, khám sức khỏe định kỳ và các hình thức hỗ trợ ốm đau, thai sản đầy đủ",
+          required: true,
+          mapToHeaders: [
+            "C9. Bảo đảm đóng BHXH, BHYT, khám sức khỏe định kỳ và các hình thức hỗ trợ ốm đau, thai sản đầy đủ",
+          ],
+        },
+        {
+          id: "C10",
+          text: "C10. Tổ chức tham quan, nghỉ dưỡng đầy đủ",
+          required: true,
+          mapToHeaders: ["C10. Tổ chức tham quan, nghỉ dưỡng đầy đủ"],
+        },
+        {
+          id: "C11",
+          text: "C11. Có phong trào thể thao, văn nghệ tích cực",
+          required: true,
+          mapToHeaders: ["C11. Có phong trào thể thao, văn nghệ tích cực"],
+        },
+        {
+          id: "C12",
+          text: "C12. Công đoàn bệnh viện hoạt động tích cực",
+          required: true,
+          mapToHeaders: ["C12. Công đoàn bệnh viện hoạt động tích cực"],
+        },
+      ],
+    },
+    {
+      title: "D. Sự hài lòng về công việc, cơ hội học tập và thăng tiến",
+      questions: [
+        {
+          id: "D1",
+          text: "D1. Khối lượng công việc được giao phù hợp",
+          required: true,
+          mapToHeaders: ["D1. Khối lượng công việc được giao phù hợp"],
+        },
+        {
+          id: "D2",
+          text: "D2. Công việc chuyên môn đáp ứng nguyện vọng bản thân",
+          required: true,
+          mapToHeaders: [
+            "D2. Công việc chuyên môn đáp ứng nguyện vọng bản thân",
+          ],
+        },
+        {
+          id: "D3",
+          text: "D3. Bệnh viện tạo điều kiện cho NVYT nâng cao trình độ chuyên môn",
+          required: true,
+          mapToHeaders: [
+            "D3. Bệnh viện tạo điều kiện cho NVYT nâng cao trình độ chuyên môn",
+          ],
+        },
+        {
+          id: "D4",
+          text: "D4. Bệnh viện tạo điều kiện cho NVYT học tiếp các bậc cao hơn",
+          required: true,
+          mapToHeaders: [
+            "D4. Bệnh viện tạo điều kiện cho NVYT học tiếp các bậc cao hơn",
+          ],
+        },
+        {
+          id: "D5",
+          text: "D5. Công khai các tiêu chuẩn cho các chức danh lãnh đạo",
+          required: true,
+          mapToHeaders: [
+            "D5. Công khai các tiêu chuẩn cho các chức danh lãnh đạo",
+          ],
+        },
+        {
+          id: "D6",
+          text: "D6. Bổ nhiệm các chức danh lãnh đạo dân chủ, công bằng",
+          required: true,
+          mapToHeaders: [
+            "D6. Bổ nhiệm các chức danh lãnh đạo dân chủ, công bằng",
+          ],
+        },
+        {
+          id: "D7",
+          text: "D7. Có cơ hội thăng tiến khi nỗ lực làm việc",
+          required: true,
+          mapToHeaders: ["D7. Có cơ hội thăng tiến khi nỗ lực làm việc"],
+        },
+      ],
+    },
+    {
+      title: "E. Sự hài lòng chung về bệnh viện",
+      questions: [
+        {
+          id: "E1",
+          text: "E1. Cảm thấy tự hào khi được làm việc tại bệnh viện",
+          required: true,
+          mapToHeaders: ["E1. Cảm thấy tự hào khi được làm việc tại bệnh viện"],
+        },
+        {
+          id: "E2",
+          text: "E2. Đạt được những thành công cá nhân khi làm việc tại bệnh viện",
+          required: true,
+          mapToHeaders: [
+            "E2. Đạt được những thành công cá nhân khi làm việc tại bệnh viện",
+          ],
+        },
+        {
+          id: "E3",
+          text: "E3. Tin tưởng vào sự phát triển của bệnh viện. trong tương lai",
+          required: true,
+          mapToHeaders: [
+            "E3. Tin tưởng vào sự phát triển của bệnh viện. trong tương lai",
+          ],
+        },
+        {
+          id: "E4",
+          text: "E4. Sẽ gắn bó làm việc tại khoa, phòng hiện tại lâu dài",
+          required: true,
+          mapToHeaders: [
+            "E4. Sẽ gắn bó làm việc tại khoa, phòng hiện tại lâu dài",
+          ],
+        },
+        {
+          id: "E5",
+          text: "E5. Sẽ gắn bó làm việc tại bệnh viện lâu dài",
+          required: true,
+          mapToHeaders: ["E5. Sẽ gắn bó làm việc tại bệnh viện lâu dài"],
+        },
+        {
+          id: "E6",
+          text: "E6. Mức độ hài lòng nói chung về lãnh đạo bệnh viện",
+          required: true,
+          mapToHeaders: ["E6. Mức độ hài lòng nói chung về lãnh đạo bệnh viện"],
+        },
+        {
+          id: "E7",
+          text: "E7. Tự đánh giá về mức độ hoàn thành công việc tại bệnh viện",
+          required: true,
+          mapToHeaders: [
+            "E7. Tự đánh giá về mức độ hoàn thành công việc tại bệnh viện",
+          ],
+        },
+      ],
+    },
+  ],
+  footer: [
+    {
+      id: "G_Staff",
+      label:
+        "G. Anh/Chị có ý kiến hoặc đề xuất nào khác với Bộ Y tế và lãnh đạo bệnh viện?",
+      type: "textarea",
+    },
+  ],
+};
+
+// ========================================
+// DATABASE OBJECT
+// ========================================
+const db = {
+  cache: [],
+
+  async call(action, payload = {}) {
+    if (!APPS_SCRIPT_URL) throw new Error("Chưa cấu hình URL Google Sheets!");
+
+    const loadingEl = document.getElementById("loading");
+    loadingEl.style.display = "flex";
+
+    try {
+      // SỬA: Dùng text/plain để tránh trình duyệt gửi Preflight Request (CORS)
+      const response = await fetch(APPS_SCRIPT_URL, {
+        method: "POST",
+        headers: { "Content-Type": "text/plain;charset=utf-8" },
+        body: JSON.stringify({ action, ...payload }),
+      });
+
+      const result = await response.json();
+      if (result.status === "error") throw new Error(result.message);
+
+      return result.data;
+    } catch (error) {
+      console.error("Database error:", error);
+      throw error;
+    } finally {
+      loadingEl.style.display = "none";
+    }
+  },
+
+  async getAll(force = false) {
+    if (this.cache.length > 0 && !force) return this.cache;
+
+    try {
+      const rawData = await this.call("read");
+      this.cache = rawData.map((row) => ({
+        id: row["Mã số phiếu (BV quy định)"] || row["id"],
+        timestamp: row["Ngày gửi"] || row["timestamp"],
+        type: row["type"] || "form1",
+        selenium_status: row["selenium_status"] || "READY",
+        ...row,
+      }));
+    } catch (error) {
+      console.error("Error fetching data:", error);
+      this.cache = [];
+    }
+
+    return this.cache;
+  },
+
+  async save(flatData) {
+    // Local backup
+    const local = JSON.parse(localStorage.getItem("byt_local_backup") || "[]");
+    local.unshift(flatData);
+    if (local.length > 100) local.length = 100; // Keep last 100 entries
+    localStorage.setItem("byt_local_backup", JSON.stringify(local));
+
+    // Save to Google Sheets
+    await this.call("create", { data: flatData });
+    this.cache = []; // Clear cache to force refresh
+  },
+
+  async delete(ids) {
+    await this.call("delete", { ids });
+    this.cache = [];
+  },
+
+  async update(ids, updates) {
+    await this.call("update", { ids, updates });
+    this.cache = [];
+  },
+};
+
+// ========================================
+// APP OBJECT (Đã cập nhật tính năng Lobby)
+// ========================================
+const app = {
+  currentForm: null,
+
+  init() {
+    const today = new Date();
+    document.getElementById("currentDateHeader").textContent =
+      today.toLocaleDateString("vi-VN");
+
+    // Mặc định hiển thị trang chủ (Landing Page)
+    this.goHome();
+    this.updateSessionUI();
+  },
+
+  // Hàm chuyển về trang chủ (Lobby)
+  goHome() {
+    this.hideAllViews();
+    document.getElementById("landing-view").classList.remove("hidden");
+    document.getElementById("landing-view").classList.add("flex"); // Đảm bảo căn giữa
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  },
+
+  // Hàm vào trang khảo sát
+  startSurvey(formId) {
+    this.hideAllViews();
+    document.getElementById("survey-view").classList.remove("hidden");
+
+    // Khởi tạo form
+    survey.switchForm(formId);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  },
+
+  // Hàm hiện trang Admin
+  showAdmin() {
+    this.hideAllViews();
+    document.getElementById("admin-view").classList.remove("hidden");
+  },
+
+  // Hàm quay lại Public (từ Admin logout hoặc toggle)
+  showPublic() {
+    this.goHome(); // Quay về sảnh chờ
+  },
+
+  // Ẩn tất cả các view để tránh chồng chéo
+  hideAllViews() {
+    document.getElementById("landing-view").classList.add("hidden");
+    document.getElementById("landing-view").classList.remove("flex");
+
+    document.getElementById("survey-view").classList.add("hidden");
+
+    document.getElementById("admin-view").classList.add("hidden");
+  },
+
+  showToast(title, message, type = "success") {
+    const toast = document.getElementById("toast");
+    const toastTitle = document.getElementById("toast-title");
+    const toastMsg = document.getElementById("toast-msg");
+
+    toastTitle.textContent = title;
+    toastMsg.textContent = message;
+
+    toast.className = toast.className.replace(
+      /border-\w+-\d+/,
+      type === "error" ? "border-red-500" : "border-teal-500",
+    );
+
+    toast.classList.remove("translate-x-full");
+    setTimeout(() => toast.classList.add("translate-x-full"), 3000);
+  },
+
+  updateSessionUI() {
+    if (SESSION_CONFIG) {
+      const interviewer = SESSION_CONFIG.interviewer.split(".")[0];
+      const respondent = SESSION_CONFIG.respondent;
+      document.getElementById("admin-lbl-interviewer").textContent =
+        interviewer;
+      document.getElementById("admin-lbl-respondent").textContent = respondent;
+    }
+  },
+};
+
+// ========================================
+// SURVEY OBJECT (Đã cập nhật)
+// ========================================
+const survey = {
+  switchForm(id) {
+    // Set current form structure
+    app.currentForm =
+      id === 1 ? form1Structure : id === 2 ? form2Structure : form3Structure;
+
+    // Cập nhật tiêu đề form hiển thị
+    const titleEl = document.getElementById("current-form-title");
+    if (titleEl) {
+      titleEl.textContent = app.currentForm.title;
+    }
+
+    // Render form
+    this.render();
+  },
+
+  render() {
+    const container = document.getElementById("surveyForm");
+    container.innerHTML = "";
+
+    // 1. Render Demographics Section
+    this.renderDemographics(container);
+
+    // 2. Render Question Sections
+    app.currentForm.sections.forEach((section) => {
+      this.renderSection(container, section);
+    });
+
+    // 3. Render Footer
+    this.renderFooter(container);
+
+    // 4. Render Submit Button
+    this.renderSubmitButton(container);
+  },
+
+  renderDemographics(container) {
+    const div = document.createElement("div");
+    div.className = "bg-white p-6 rounded-xl shadow-sm border border-gray-100";
+    div.innerHTML = `
+            <h2 class="font-bold border-b pb-2 mb-4">I. THÔNG TIN NGƯỜI BỆNH/NHÂN VIÊN</h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4" id="demo-grid"></div>
+        `;
+
+    const grid = div.querySelector("#demo-grid");
+    app.currentForm.demographics.forEach((field) => {
+      grid.appendChild(this.createField(field));
+    });
+
+    container.appendChild(div);
+  },
+
+  renderSection(container, section) {
+    const div = document.createElement("div");
+    div.className = "bg-white p-6 rounded-xl shadow-sm border border-gray-100";
+    div.innerHTML = `<h2 class="font-bold text-teal-700 mb-4">${section.title}</h2>`;
+
+    section.questions.forEach((question) => {
+      div.appendChild(this.createQuestion(question));
+    });
+
+    container.appendChild(div);
+  },
+
+  renderFooter(container) {
+    const div = document.createElement("div");
+    div.className = "bg-white p-6 rounded-xl shadow-sm border border-gray-100";
+    div.innerHTML = `
+            <h2 class="font-bold border-b pb-2 mb-4">THÔNG TIN KHÁC</h2>
+            <div class="space-y-4" id="footer-grid"></div>
+        `;
+
+    const grid = div.querySelector("#footer-grid");
+    app.currentForm.footer.forEach((field) => {
+      grid.appendChild(this.createField(field));
+    });
+
+    container.appendChild(div);
+  },
+
+  renderSubmitButton(container) {
+    const div = document.createElement("div");
+    div.className = "sticky bottom-4 z-40";
+    div.innerHTML = `
+            <button type="submit" class="w-full bg-teal-600 hover:bg-teal-700 text-white font-bold py-4 rounded-xl shadow-lg transition">
+                GỬI PHIẾU KHẢO SÁT
+            </button>
+        `;
+    container.appendChild(div);
+  },
+
+  createField(field) {
+    const div = document.createElement("div");
+    div.className =
+      field.width === "full" ? "col-span-1 md:col-span-2" : "col-span-1";
+    div.id = `${field.id}_container`;
+
+    const req = field.required ? "required" : "";
+    let inputHTML = "";
+
+    switch (field.type) {
+      case "select":
+        inputHTML = `
+                    <select name="${field.id}" ${req} class="w-full border p-2 rounded focus:ring-2 focus:ring-teal-500 outline-none">
+                        <option value="">-- Chọn --</option>
+                        ${field.options.map((opt) => `<option value="${opt}">${opt}</option>`).join("")}
+                    </select>
+                `;
+        break;
+
+      case "radio":
+        inputHTML = `
+                    <div class="flex flex-col sm:flex-row flex-wrap gap-2 mt-2">
+                        ${field.options
+                          .map(
+                            (opt) => `
+                            <label class="flex items-center p-2 border rounded hover:bg-gray-50 cursor-pointer">
+                                <input type="radio" name="${field.id}" value="${opt}" ${req} class="mr-2 w-4 h-4 text-teal-600 focus:ring-teal-500">
+                                ${opt}
+                            </label>
+                        `,
+                          )
+                          .join("")}
+                    </div>
+                `;
+        break;
+
+      case "textarea":
+        inputHTML = `
+                    <textarea name="${field.id}" rows="3" ${req} 
+                        class="w-full border p-2 rounded focus:ring-2 focus:ring-teal-500 outline-none" 
+                        placeholder="Nhập ý kiến của bạn..."></textarea>
+                `;
+        break;
+
+      default:
+        inputHTML = `
+                    <div class="flex items-center">
+                        <input type="${field.type}" name="${field.id}" ${req} 
+                            class="w-full border p-2 rounded focus:ring-2 focus:ring-teal-500 outline-none" 
+                            placeholder="${field.placeholder || ""}">
+                        ${field.suffix ? `<span class="ml-2 font-bold">${field.suffix}</span>` : ""}
+                    </div>
+                `;
+    }
+
+    div.innerHTML = `
+            <label class="block text-sm font-medium mb-1 text-gray-700">
+                ${field.label} 
+                ${field.required ? '<span class="text-red-500">*</span>' : ""}
+            </label>
+            ${inputHTML}
+            <div class="text-xs text-red-500 hidden mt-1 error-msg">Vui lòng nhập thông tin này</div>
+        `;
+
+    return div;
+  },
+
+  createQuestion(question) {
+    const div = document.createElement("div");
+    div.className =
+      "mb-6 pb-6 border-b last:border-0 transition-colors duration-300 rounded p-2";
+    div.id = `${question.id}_container`;
+
+    let optionsHTML = "";
+
+    if (question.isCost) {
+      // Special cost question
+      const costOptions = [
+        "1. Rất đắt so với chất lượng",
+        "2. Đắt hơn so với chất lượng",
+        "3. Tương xứng so với chất lượng",
+        "4. Rẻ hơn so với chất lượng",
+        "5. Không tự chi trả nên không biết",
+        "6. Ý kiến khác",
+      ];
+
+      optionsHTML = `
+                <div class="mt-2 space-y-2">
+                    ${costOptions
+                      .map(
+                        (opt) => `
+                        <label class="flex items-center p-2 border rounded hover:bg-gray-50 cursor-pointer">
+                            <input type="radio" name="${question.id}" value="${opt}" required 
+                                class="mr-2 w-4 h-4 text-teal-600">
+                            ${opt}
+                        </label>
+                    `,
+                      )
+                      .join("")}
+                </div>
+            `;
+    } else {
+      // Standard 1-5 scale (Đã sửa: Không hiện nút 0 nếu là form3)
+      const showZero = app.currentForm.id !== "form3";
+
+      optionsHTML = `
+                <div class="flex gap-2 radio-scale justify-center sm:justify-start mt-2">
+                    ${[1, 2, 3, 4, 5]
+                      .map((val) => {
+                        const labels = [
+                          "Rất kém",
+                          "Kém",
+                          "TB",
+                          "Tốt",
+                          "Rất tốt",
+                        ];
+                        const lowClass = val <= 3 ? "rate-low" : "";
+                        return `
+                            <div class="flex flex-col items-center">
+                                <input type="radio" name="${question.id}" id="${question.id}_${val}" value="${val}" required class="hidden peer">
+                                <label for="${question.id}_${val}" class="${lowClass} w-10 h-10 flex items-center justify-center rounded-full border cursor-pointer hover:bg-gray-100 peer-checked:text-white transition font-bold">
+                                    ${val}
+                                </label>
+                                <span class="text-[10px] text-gray-400 mt-1">${labels[val - 1]}</span>
+                            </div>
+                        `;
+                      })
+                      .join("")}
+                    
+                    ${
+                      showZero
+                        ? `
+                    <div class="flex flex-col items-center ml-4 border-l pl-4">
+                        <input type="radio" name="${question.id}" id="${question.id}_0" value="0" required class="hidden peer">
+                        <label for="${question.id}_0" class="w-10 h-10 flex items-center justify-center rounded-full border cursor-pointer hover:bg-gray-100 peer-checked:bg-gray-500 peer-checked:text-white transition font-bold">
+                            0
+                        </label>
+                        <span class="text-[10px] text-gray-400 mt-1">N/A</span>
+                    </div>
+                    `
+                        : ""
+                    }
+                </div>
+            `;
+    }
+
+    div.innerHTML = `
+            <div class="mb-2">
+                <span class="font-bold text-teal-800 text-lg mr-2">${question.id.replace("S_", "")}.</span>
+                <span class="font-medium">${question.text} ${question.required ? '<span class="text-red-500">*</span>' : ""}</span>
+            </div>
+            ${optionsHTML}
+            <div class="text-xs text-red-500 hidden mt-2 font-bold error-msg">
+                <i class="fas fa-exclamation-circle"></i> Vui lòng chọn một tùy chọn
+            </div>
+        `;
+
+    return div;
+  },
+
+  validate(formData) {
+    // Clear previous errors
+    document
+      .querySelectorAll(".error-highlight")
+      .forEach((el) => el.classList.remove("error-highlight"));
+    document
+      .querySelectorAll(".error-msg")
+      .forEach((el) => el.classList.add("hidden"));
+
+    let firstError = null;
+
+    // Validate demographics
+    app.currentForm.demographics.forEach((field) => {
+      if (field.required && !formData.get(field.id)) {
+        const container = document.getElementById(`${field.id}_container`);
+        if (container) {
+          container.classList.add("error-highlight");
+          container.querySelector(".error-msg").classList.remove("hidden");
+          if (!firstError) firstError = container;
+        }
+      }
+    });
+
+    // Validate sections
+    app.currentForm.sections.forEach((section) => {
+      section.questions.forEach((question) => {
+        if (question.required && !formData.get(question.id)) {
+          const container = document.getElementById(`${question.id}_container`);
+          if (container) {
+            container.classList.add("error-highlight");
+            container.querySelector(".error-msg").classList.remove("hidden");
+            if (!firstError) firstError = container;
+          }
+        }
+      });
+    });
+
+    // Validate footer
+    app.currentForm.footer.forEach((field) => {
+      if (field.required && !formData.get(field.id)) {
+        const container = document.getElementById(`${field.id}_container`);
+        if (container) {
+          container.classList.add("error-highlight");
+          container.querySelector(".error-msg").classList.remove("hidden");
+          if (!firstError) firstError = container;
+        }
+      }
+    });
+
+    // Scroll to first error
+    if (firstError) {
+      firstError.scrollIntoView({ behavior: "smooth", block: "center" });
+      return false;
+    }
+
+    return true;
+  },
+
+  async handleSubmit(event) {
+    event.preventDefault();
+
+    // 1. Kiểm tra cấu hình phiên (Bắt buộc với Mẫu 1 & 2)
+    // Mẫu 3 (Nhân viên) có thể tự điền mà không cần người phỏng vấn
+    if (app.currentForm.id !== "form3" && !SESSION_CONFIG) {
+      alert(
+        "Lỗi: Hệ thống chưa được cấu hình phiên làm việc. Vui lòng liên hệ nhân viên y tế hoặc Admin để thiết lập!",
+      );
+      return;
+    }
+
+    const formData = new FormData(event.target);
+
+    // 2. Validate dữ liệu (Kiểm tra các trường bắt buộc)
+    if (!this.validate(formData)) return;
+
+    // 3. Chuẩn bị dữ liệu thô
+    const rawData = Object.fromEntries(formData.entries());
+    const now = new Date();
+
+    // 4. Xây dựng Payload để gửi lên Google Sheets
+    // Các trường này phải khớp với Tên Cột trong Google Sheet
+    const payload = {
+      // --- Thông tin chung ---
+      "Kiểu khảo sát": app.currentForm.title,
+      "Mã số phiếu": "", // Sẽ sinh tự động bên dưới
+      "1. Tên bệnh viện": DEFAULT_HOSPITAL,
+      "Mã bệnh viện": "16410",
+      "2. Ngày điền phiếu": now.toLocaleDateString("vi-VN"),
+
+      // Lấy thông tin từ Session Config (nếu có)
+      "3. Người phỏng vấn/điền phiếu": SESSION_CONFIG
+        ? SESSION_CONFIG.interviewer
+        : "",
+      "4. Người trả lời": SESSION_CONFIG ? SESSION_CONFIG.respondent : "",
+    };
+
+    // --- Mapping: Thông tin hành chính (Demographics) ---
+    app.currentForm.demographics.forEach((field) => {
+      // Chỉ lấy các trường có ID bắt đầu bằng 'a' hoặc là 'khoa_phong'
+      if (field.id.startsWith("a") || field.id === "khoa_phong") {
+        payload[field.label] = rawData[field.id] || "";
+      }
+    });
+
+    // --- Mapping: Câu hỏi khảo sát (Sections) ---
+    app.currentForm.sections.forEach((section) => {
+      section.questions.forEach((question) => {
+        const value = rawData[question.id];
+
+        // Một câu hỏi trong code (ví dụ S_A1) có thể map vào nhiều cột trong Excel
+        if (question.mapToHeaders) {
+          question.mapToHeaders.forEach((header) => {
+            payload[header] = value;
+          });
+        }
+      });
+    });
+
+    // --- Mapping: Footer ---
+    app.currentForm.footer.forEach((field) => {
+      payload[field.label] = rawData[field.id] || "";
+    });
+
+    // --- Hệ thống: Meta Data (Dùng cho Admin/Code) ---
+    const uniqueId = Date.now().toString().slice(-8); // Tạo ID ngắn 8 số
+
+    payload["Mã số phiếu (BV quy định)"] = uniqueId;
+    payload["id"] = uniqueId;
+    payload["timestamp"] = now.toISOString();
+    payload["type"] = app.currentForm.id;
+    payload["selenium_status"] = "READY"; // Đánh dấu để Tool Selenium chạy sau này
+
+    // Lưu toàn bộ dữ liệu thô dạng JSON để Admin dễ dàng sửa lại form sau này
+    payload["python_data"] = JSON.stringify(rawData);
+
+    // 5. Gửi dữ liệu (Database Call)
+    try {
+      await db.save(payload);
+
+      // Thông báo thành công
+      app.showToast("Thành công", "Đã gửi phiếu khảo sát!");
+
+      // Reset form
+      event.target.reset();
+
+      // === QUAN TRỌNG: Quay về Sảnh Chờ sau 1.5 giây ===
+      setTimeout(() => {
+        if (typeof app.goHome === "function") {
+          app.goHome(); // Dùng hàm mới nếu đã cài đặt Page riêng
+        } else {
+          app.showLobby(); // Fallback nếu dùng tên hàm cũ
+        }
+      }, 1500);
+    } catch (error) {
+      console.error("Submit error:", error);
+      app.showToast("Lỗi", "Không thể gửi phiếu: " + error.message, "error");
+    }
+  },
+};
