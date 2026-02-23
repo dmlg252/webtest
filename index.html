@@ -302,24 +302,12 @@
             <div
               class="mt-6 bg-gray-50 p-3 rounded border border-gray-200 text-xs"
             >
-              <p class="font-bold text-gray-500 uppercase mb-1">
+              <p class="font-bold text-gray-500 uppercase mb-2">
                 Trạng thái Phiên
               </p>
-              <div class="mb-1 truncate">
-                <span class="text-gray-400">PV:</span>
-                <span
-                  id="admin-lbl-interviewer"
-                  class="font-medium text-teal-700 truncate block"
-                  >--</span
-                >
-              </div>
-              <div class="truncate">
-                <span class="text-gray-400">TL:</span>
-                <span
-                  id="admin-lbl-respondent"
-                  class="font-medium text-teal-700 truncate block"
-                  >--</span
-                >
+              <div id="admin-session-status" class="space-y-1">
+                <!-- JS sẽ đẩy nội dung vào đây -->
+                <span class="text-gray-400">Đang tải...</span>
               </div>
             </div>
           </div>
@@ -573,53 +561,45 @@
       <div
         class="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-md border-t-4 border-teal-600 animate-fade-in-up"
       >
-        <h3 class="text-xl font-bold text-teal-800 mb-2">
-          Cấu Hình Phiên Làm Việc
-        </h3>
-        <p class="text-sm text-gray-500 mb-6">
-          Thiết lập các thông tin dùng chung cho tất cả các phiếu trong phiên
-          này.
+        <h3 class="text-xl font-bold text-teal-800 mb-2">Cấu Hình Phiên</h3>
+        <p class="text-sm text-gray-500 mb-4">
+          Thiết lập thông tin mặc định chung cho từng mẫu khảo sát.
         </p>
-        <div class="space-y-4">
-          <div>
-            <label class="block text-sm font-medium mb-1"
-              >3. Người phỏng vấn / điền phiếu
-              <span class="text-red-500">*</span></label
+
+        <!-- Chọn Mẫu để cấu hình -->
+        <div class="mb-4">
+          <label class="block text-sm font-bold text-gray-700 mb-1"
+            >Chọn Mẫu cấu hình</label
+          >
+          <div class="flex bg-gray-100 p-1 rounded-lg">
+            <button
+              onclick="admin.switchSessionTab('form1')"
+              id="tab-form1"
+              class="flex-1 py-1.5 text-sm font-medium rounded-md bg-white shadow text-teal-700 transition"
             >
-            <select
-              id="session-interviewer"
-              class="w-full border border-gray-300 p-2.5 rounded-lg focus:ring-2 focus:ring-teal-500 outline-none bg-white text-sm"
+              Mẫu 1 (Nội)
+            </button>
+            <button
+              onclick="admin.switchSessionTab('form2')"
+              id="tab-form2"
+              class="flex-1 py-1.5 text-sm font-medium rounded-md text-gray-500 hover:text-gray-700 transition"
             >
-              <option value="">-- Chọn --</option>
-              <option value="1. a. Người bệnh tự điền (hoặc người nhà)">
-                1. a. Người bệnh tự điền (hoặc người nhà)
-              </option>
-              <option value="2. b. Nhân viên của bệnh viện">
-                2. b. Nhân viên của bệnh viện
-              </option>
-              <option value="3. c. Bộ Y tế, Sở Y tế hoặc đoàn giám sát">
-                3. c. Bộ Y tế, Sở Y tế hoặc đoàn giám sát
-              </option>
-              <option value="4. d. Tổ chức độc lập">
-                4. d. Tổ chức độc lập
-              </option>
-              <option value="5. e. Đối tượng khác">5. e. Đối tượng khác</option>
-            </select>
-          </div>
-          <div>
-            <label class="block text-sm font-medium mb-1"
-              >4. Người trả lời <span class="text-red-500">*</span></label
+              Mẫu 2 (Ngoại)
+            </button>
+            <button
+              onclick="admin.switchSessionTab('form3')"
+              id="tab-form3"
+              class="flex-1 py-1.5 text-sm font-medium rounded-md text-gray-500 hover:text-gray-700 transition"
             >
-            <select
-              id="session-respondent"
-              class="w-full border border-gray-300 p-2.5 rounded-lg focus:ring-2 focus:ring-teal-500 outline-none bg-white text-sm"
-            >
-              <option value="">-- Chọn đối tượng --</option>
-              <option value="Người bệnh">Người bệnh</option>
-              <option value="Người nhà">Người nhà người bệnh</option>
-            </select>
+              Mẫu 3 (NV)
+            </button>
           </div>
         </div>
+
+        <div class="space-y-4" id="session-fields-container">
+          <!-- Form Fields sẽ được render bằng JS vào đây -->
+        </div>
+
         <div class="mt-8 flex gap-3">
           <button
             onclick="
@@ -902,6 +882,52 @@
             class="px-4 py-2 bg-teal-600 text-white font-bold rounded hover:bg-teal-700 shadow text-sm"
           >
             Áp dụng
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- NEW: Export Choice Modal -->
+    <div
+      id="exportChoiceModal"
+      class="fixed inset-0 bg-gray-900 bg-opacity-50 hidden z-[70] flex items-center justify-center p-4"
+    >
+      <div
+        class="bg-white rounded-xl shadow-xl w-full max-w-sm p-6 animate-fade-in-up"
+      >
+        <h3 class="font-bold text-lg mb-2">Chọn Mẫu Để Xuất Excel</h3>
+        <p class="text-sm text-gray-500 mb-4">
+          Hệ thống sẽ tải về file Excel chứa toàn bộ dữ liệu của mẫu bạn đã
+          chọn.
+        </p>
+        <div class="mb-6">
+          <label class="block text-sm font-medium mb-1">Chọn loại phiếu</label>
+          <select
+            id="exportSheetSelect"
+            class="w-full border border-gray-300 p-2.5 rounded-lg bg-gray-50 text-sm focus:ring-2 focus:ring-teal-500 outline-none"
+          >
+            <option value="">-- Vui lòng chọn --</option>
+            <option value="form1">Mẫu 1 - Nội Trú</option>
+            <option value="form2">Mẫu 2 - Ngoại Trú</option>
+            <option value="form3">Mẫu 3 - Nhân Viên</option>
+          </select>
+        </div>
+        <div class="flex justify-end gap-2">
+          <button
+            onclick="
+              document
+                .getElementById('exportChoiceModal')
+                .classList.add('hidden')
+            "
+            class="px-4 py-2 bg-gray-100 rounded hover:bg-gray-200 text-sm"
+          >
+            Hủy
+          </button>
+          <button
+            onclick="admin.handleExportChoice()"
+            class="px-4 py-2 bg-green-600 text-white font-bold rounded hover:bg-green-700 shadow text-sm"
+          >
+            <i class="fas fa-file-excel mr-1.5"></i>Tải Xuống
           </button>
         </div>
       </div>

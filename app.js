@@ -3,7 +3,7 @@
 // ========================================
 const DEFAULT_HOSPITAL = "Bệnh viện Phụ Sản Hải Phòng";
 const DEFAULT_SCRIPT_URL =
-  "https://script.google.com/macros/s/AKfycbyVjQq7Z3nPpRKs7ShzVWm1y63_yJ7Cyna3G9bF5GlcaB_wJg_A39OHwRQWieNqG_hw/exec";
+  "https://script.google.com/macros/s/AKfycbwZBEmHpGq8VQGe3nYdTbbWbVd1o6JY_zF0wg2arRVvwbxwzez54rmvx5acz1V1JBdX/exec";
 
 let APPS_SCRIPT_URL =
   localStorage.getItem("BYT_SCRIPT_URL") || DEFAULT_SCRIPT_URL;
@@ -11,16 +11,26 @@ let SESSION_CONFIG = JSON.parse(
   localStorage.getItem("BYT_SESSION_CONFIG") || "null",
 );
 
+if (!SESSION_CONFIG || !SESSION_CONFIG.form1) {
+  SESSION_CONFIG = {
+    form1: { kieu_khao_sat: "", nguoipv: "", nguoi_tra_loi: "" },
+    form2: { kieu_khao_sat: "", nguoipv: "", nguoi_tra_loi: "" },
+    form3: { kieu_khao_sat: "" },
+  };
+}
+
 // ========================================
 // DATA STRUCTURES
 // ========================================
 
-// Footer chung cho mẫu 1 và 2
-const commonPatientFooter = [
+// Footer for Mẫu 1 (Nội trú) - Text matches backend exactly
+const form1Footer = [
   {
     id: "G1",
     label:
-      "G1. Đánh giá chung, bệnh viện đã đáp ứng được bao nhiêu % so với mong đợi của Ông/Bà trước khi nằm viện/tới khám? (0-100)",
+      "G1. Đánh giá chung, bệnh viện đã đáp ứng được bao nhiêu % so với mong đợi của Ông/Bà trước khi nằm viện? (0-100)",
+    mapToHeader:
+      "G1. Đánh giá chung, bệnh viện đã đáp ứng được bao nhiêu % so với mong đợi của Ông/Bà trước khi nằm viện?",
     type: "number",
     required: true,
     suffix: "%",
@@ -28,7 +38,9 @@ const commonPatientFooter = [
   {
     id: "G2",
     label:
-      "G2. Nếu có nhu cầu khám, chữa những bệnh, Ông/Bà có quay trở lại hoặc giới thiệu cho người khác đến không?",
+      "G2. Nếu có nhu cầu khám, chữa bệnh, Ông/Bà có quay trở lại hoặc giới thiệu cho người khác đến không?",
+    mapToHeader:
+      "G2. Nếu có nhu cầu khám, chữa bệnh, Ông/Bà có quay trở lại hoặc giới thiệu cho người khác đến không?",
     type: "select",
     required: true,
     options: [
@@ -44,12 +56,63 @@ const commonPatientFooter = [
     id: "H1",
     label:
       "H1. Đối với các câu hỏi có ý kiến chưa hài lòng, đề nghị Ông/Bà ghi rõ thêm lý do tại sao không hài lòng?",
+    mapToHeader:
+      "H1. Đối với các câu hỏi có ý kiến chưa hài lòng, đề nghị Ông/Bà ghi rõ thêm lý do tại sao không hài lòng?",
     type: "textarea",
   },
   {
     id: "H2",
     label:
       "H2. Ông/Bà có ý kiến hoặc nhận xét gì khác giúp bệnh viện và hệ thống khám, chữa bệnh phục vụ người bệnh được tốt hơn, xin ghi rõ?",
+    mapToHeader:
+      "H2. Ông/Bà có ý kiến hoặc nhận xét gì khác giúp bệnh viện và hệ thống khám, chữa bệnh phục vụ người bệnh được tốt hơn, xin ghi rõ?",
+    type: "textarea",
+  },
+];
+
+// Footer for Mẫu 2 (Ngoại trú) - Text matches backend exactly
+const form2Footer = [
+  {
+    id: "G1",
+    label:
+      "G1. Đánh giá chung, bệnh viện đã đáp ứng được bao nhiêu % so với mong đợi của Ông/Bà trước khi tới khám bệnh? (0-100)",
+    mapToHeader:
+      "G1. Đánh giá chung bệnh viện đã đáp ứng được bao nhiêu % so với mong đợi trước khi tới khám bệnh?",
+    type: "number",
+    required: true,
+    suffix: "%",
+  },
+  {
+    id: "G2",
+    label:
+      "G2. Nếu có nhu cầu khám bệnh, Ông/Bà có quay trở lại hoặc giới thiệu cho người khác đến không?",
+    mapToHeader:
+      "G2. Nếu có nhu cầu khám bệnh, Ông/Bà có quay trở lại hoặc giới thiệu cho người khác đến không?",
+    type: "select",
+    required: true,
+    options: [
+      "1. Chắc chắn không bao giờ quay lại",
+      "2. Không muốn quay lại nhưng có ít lựa chọn khác",
+      "3. Muốn chuyển sang bệnh viện khác",
+      "4. Có thể sẽ quay lại",
+      "5. Chắc chắn sẽ quay lại hoặc giới thiệu cho người khác",
+      "6. Khác",
+    ],
+  },
+  {
+    id: "H1",
+    label:
+      "H1. Đối với các câu hỏi có ý kiến chưa hài lòng, đề nghị Ông/Bà ghi rõ thêm lý do tại sao không hài lòng?",
+    mapToHeader:
+      "H1. Đối với các câu hỏi có ý kiến chưa hài lòng, đề nghị Ông/Bà ghi rõ thêm lý do tại sao không hài lòng",
+    type: "textarea",
+  },
+  {
+    id: "H2",
+    label:
+      "H2. Ông/Bà có ý kiến hoặc nhận xét gì khác giúp bệnh viện và hệ thống khám, chữa bệnh phục vụ người bệnh được tốt hơn, xin ghi rõ?",
+    mapToHeader:
+      "H2. Ông/Bà có ý kiến hoặc nhận xét gì khác giúp bệnh viện và hệ thống khám, chữa bệnh phục vụ người bệnh tốt hơn?",
     type: "textarea",
   },
 ];
@@ -60,8 +123,46 @@ const form1Structure = {
   title: "Nội Trú (Mẫu 01)",
   demographics: [
     {
+      id: "kieu_khao_sat",
+      label: "Kiểu khảo sát",
+      type: "select",
+      options: [
+        "1. Bệnh viện tự đánh giá hàng tháng/quý",
+        "2. Bệnh viện tự đánh giá cuối năm",
+        "3. Do đoàn Bộ Y tế/Sở Y tế thực hiện",
+        "4. Do đoàn phúc tra của BYT thực hiện",
+        "5. Do đoàn kiểm tra chéo",
+        "6. Hình thức khác",
+      ],
+      required: true,
+      width: "full",
+    },
+    {
+      id: "nguoipv",
+      label: "Người phỏng vấn/điền phiếu",
+      type: "select",
+      options: [
+        "a. Người bệnh tự điền (hoặc người nhà)",
+        "b. Nhân viên của bệnh viện",
+        "c. Bộ Y tế, Sở Y tế hoặc các đoàn giám sát của cơ quan quản lý",
+        "d. Tổ chức độc lập",
+        "e. Đối tượng khác, ghi rõ…",
+      ],
+      required: true,
+      width: "full",
+    },
+    {
+      id: "nguoi_tra_loi",
+      label: "Người trả lời",
+      type: "select",
+      options: ["a. Người bệnh", "b. Người nhà"],
+      required: true,
+      width: "half",
+    },
+    {
       id: "a1_gender",
       label: "A1. Giới tính",
+      mapToHeader: "Giới tính",
       type: "radio",
       options: ["1. Nam", "2. Nữ", "3. Khác"],
       required: true,
@@ -70,6 +171,7 @@ const form1Structure = {
     {
       id: "a2_age",
       label: "A2. Tuổi hoặc năm sinh",
+      mapToHeader: "Tuổi hoặc năm sinh",
       type: "number",
       required: true,
       width: "half",
@@ -77,6 +179,7 @@ const form1Structure = {
     {
       id: "a3_phone",
       label: "A3. Số di động",
+      mapToHeader: "Số di động",
       type: "tel",
       required: false,
       width: "half",
@@ -84,6 +187,7 @@ const form1Structure = {
     {
       id: "a4_days",
       label: "A4. Số ngày nằm viện",
+      mapToHeader: "Số ngày nằm viện",
       type: "number",
       required: true,
       width: "half",
@@ -91,6 +195,7 @@ const form1Structure = {
     {
       id: "a5_bhyt",
       label: "A5. Ông/Bà có sử dụng thẻ BHYT cho lần điều trị này không?",
+      mapToHeader: "Ông/Bà có sử dụng thẻ BHYT cho lần điều trị này không?",
       type: "radio",
       options: ["1. Có", "2. Không"],
       required: true,
@@ -99,6 +204,7 @@ const form1Structure = {
     {
       id: "a6_place",
       label: "A6. Nơi sinh sống hiện nay",
+      mapToHeader: "Nơi sinh sống hiện nay",
       type: "select",
       options: ["1. Thành thị", "2. Nông thôn", "3. Vùng sâu, xa khó khăn"],
       required: true,
@@ -107,6 +213,7 @@ const form1Structure = {
     {
       id: "a7_economy",
       label: "A7. Phân loại mức sống của gia đình",
+      mapToHeader: "Phân loại mức sống của gia đình",
       type: "select",
       options: ["1. Nghèo", "2. Cận nghèo", "3. Khác"],
       required: true,
@@ -116,6 +223,8 @@ const form1Structure = {
       id: "a8_times",
       label:
         "A8. Đây là lần điều trị thứ mấy của Ông/Bà tại bệnh viện? Lần thứ:",
+      mapToHeader:
+        "Đây là lần điều trị thứ mấy của Ông/Bà tại bệnh viện? (Lần thứ:)",
       type: "number",
       required: true,
       width: "full",
@@ -127,7 +236,7 @@ const form1Structure = {
       questions: [
         {
           id: "S_A1",
-          text: "Di chuyển, thông tin, sơ đồ, biển báo (A1, A2, A3, A5)",
+          text: "Việc di chuyển, tìm kiếm thông tin và được nhân viên hướng dẫn trong bệnh viện thuận tiện, dễ dàng.",
           required: true,
           mapToHeaders: [
             "A1. Các sơ đồ, biển báo chỉ dẫn đường đến các khoa, phòng và thông báo giờ khám, chữa bệnh, giờ vào thăm rõ ràng, dễ hiểu",
@@ -138,7 +247,7 @@ const form1Structure = {
         },
         {
           id: "S_A2",
-          text: "Chờ đợi thang máy/thủ tục (A4)",
+          text: "Thời gian chờ đợi khám chữa bệnh chấp nhận được",
           required: true,
           mapToHeaders: [
             "A4. Thời gian chờ đợi thang máy, làm thủ tục và chờ đợi trong quá trình khám, chữa bệnh chấp nhận được",
@@ -151,7 +260,7 @@ const form1Structure = {
       questions: [
         {
           id: "S_B1",
-          text: "Quy trình, hướng dẫn, giải thích (B1, B3, B4, B5, B6)",
+          text: "Ông/Bà được hướng dẫn đầy đủ, rõ ràng về: quy trình khám chữa bệnh, nội quy nhập viện, thông tin điều trị",
           required: true,
           mapToHeaders: [
             "B1. Quy trình, thủ tục hành chính (nhập, xuất viện, chuyển viện, chuyển khoa…) rõ ràng, công khai, thuận tiện",
@@ -163,7 +272,7 @@ const form1Structure = {
         },
         {
           id: "S_B2",
-          text: "Giá cả công khai, thuốc, chi phí (B2, B7)",
+          text: "Thông tin về thuốc và chi phí điều trị được công khai, rõ ràng và cập nhật.",
           required: true,
           mapToHeaders: [
             "B2. Giá dịch vụ y tế được niêm yết, thông báo công khai ở vị trí dễ quan sát, dễ đọc, dễ hiểu và được tư vấn, giải thích các chi phí cao nếu có",
@@ -177,7 +286,7 @@ const form1Structure = {
       questions: [
         {
           id: "S_C1",
-          text: "Buồng bệnh, vệ sinh, phương tiện (C1, C3-C7, C11)",
+          text: "Cơ sở vật chất trong phòng bệnh (giường nằm, quạt/điều hòa, nhà vệ sinh, nước uống, quần áo…) sạch sẽ, đầy đủ và thuận tiện sử dụng",
           required: true,
           mapToHeaders: [
             "C1. Buồng bệnh khang trang, sạch sẽ, có đầy đủ các thiết bị điều chỉnh nhiệt độ phù hợp như quạt, máy sưởi, hoặc điều hòa",
@@ -191,7 +300,7 @@ const form1Structure = {
         },
         {
           id: "S_C2",
-          text: "An ninh, riêng tư (C2, C8)",
+          text: "Đảm bảo sự riêng tư, an toàn cho người bệnh (rèm che, vách ngăn, an ninh, …)",
           required: true,
           mapToHeaders: [
             "C2. Buồng bệnh yên tĩnh, bảo đảm an toàn, an ninh, trật tự, phòng ngừa trộm cắp, yên tâm khi nằm viện",
@@ -200,7 +309,7 @@ const form1Structure = {
         },
         {
           id: "S_C3",
-          text: "Khuôn viên, Căng-tin (C9, C10)",
+          text: "Môi trường sinh hoạt (Khuôn viên bệnh viện và khu căng-tin) sạch sẽ, thuận tiện và đáp ứng tốt nhu cầu sinh hoạt của người bệnh",
           required: true,
           mapToHeaders: [
             "C9. Căng-tin bệnh viện phục vụ ăn uống và nhu cầu sinh hoạt thiết yếu đầy đủ và chất lượng",
@@ -214,7 +323,7 @@ const form1Structure = {
       questions: [
         {
           id: "S_D1",
-          text: "Giao tiếp, thái độ, không vòi vĩnh (D1, D2, D3, D7)",
+          text: "Nhân viên y tế có thái độ giao tiếp đúng mực, tôn trọng, công bằng, không gợi ý bồi dưỡng.",
           required: true,
           mapToHeaders: [
             "D1. Bác sỹ, điều dưỡng có lời nói, thái độ, giao tiếp đúng mực",
@@ -225,7 +334,7 @@ const form1Structure = {
         },
         {
           id: "S_D2",
-          text: "Chuyên môn, thăm khám (D4, D5, D6)",
+          text: "Bác sĩ và điều dưỡng thăm khám, chăm sóc, tư vấn rõ ràng và kịp thời.",
           required: true,
           mapToHeaders: [
             "D4. Bác sỹ, điều dưỡng hợp tác tốt và xử lý công việc thành thạo, kịp thời",
@@ -240,7 +349,7 @@ const form1Structure = {
       questions: [
         {
           id: "S_E1",
-          text: "Kết quả điều trị, chờ đợi, vật tư (E1-E5)",
+          text: "Kết quả điều trị, trang thiết bị và thuốc đáp ứng mong đợi.",
           required: true,
           mapToHeaders: [
             "E1. Thời gian chờ đợi khi khám, chữa bệnh tại bệnh viện",
@@ -252,7 +361,7 @@ const form1Structure = {
         },
         {
           id: "S_E2",
-          text: "Tin tưởng chất lượng (E6)",
+          text: "Ông/Bà tin tưởng về chất lượng dịch vụ y tế.",
           required: true,
           mapToHeaders: [
             "E6. Ông/Bà đánh giá mức độ tin tưởng về chất lượng dịch vụ y tế",
@@ -260,7 +369,7 @@ const form1Structure = {
         },
         {
           id: "S_E3",
-          text: "Chi phí tương xứng (E7)",
+          text: "Ông/Bà cho nhận xét về số tiền chi trả có tương xứng với chất lượng dịch vụ y tế không?",
           required: true,
           isCost: true,
           mapToHeaders: [
@@ -270,7 +379,7 @@ const form1Structure = {
       ],
     },
   ],
-  footer: commonPatientFooter,
+  footer: form1Footer,
 };
 
 // Mẫu 2: Ngoại trú
@@ -279,8 +388,46 @@ const form2Structure = {
   title: "Ngoại Trú (Mẫu 02)",
   demographics: [
     {
+      id: "kieu_khao_sat",
+      label: "Kiểu khảo sát",
+      type: "select",
+      options: [
+        "1. Bệnh viện tự đánh giá hàng tháng/quý",
+        "2. Bệnh viện tự đánh giá cuối năm",
+        "3. Do đoàn Bộ Y tế/Sở Y tế thực hiện",
+        "4. Do đoàn phúc tra của BYT thực hiện",
+        "5. Do đoàn kiểm tra chéo",
+        "6. Hình thức khác",
+      ],
+      required: true,
+      width: "full",
+    },
+    {
+      id: "nguoipv",
+      label: "Người phỏng vấn/điền phiếu",
+      type: "select",
+      options: [
+        "a. Người bệnh tự điền (hoặc người nhà)",
+        "b. Nhân viên của bệnh viện",
+        "c. Bộ Y tế, Sở Y tế hoặc các đoàn giám sát của cơ quan quản lý",
+        "d. Tổ chức độc lập",
+        "e. Đối tượng khác, ghi rõ…",
+      ],
+      required: true,
+      width: "full",
+    },
+    {
+      id: "nguoi_tra_loi",
+      label: "Người trả lời",
+      type: "select",
+      options: ["a. Người bệnh", "b. Người nhà"],
+      required: true,
+      width: "half",
+    },
+    {
       id: "a1_gender",
       label: "A1. Giới tính",
+      mapToHeader: "Giới tính",
       type: "radio",
       options: ["1. Nam", "2. Nữ", "3. Khác"],
       required: true,
@@ -289,6 +436,7 @@ const form2Structure = {
     {
       id: "a2_age",
       label: "A2. Tuổi hoặc năm sinh",
+      mapToHeader: "Tuổi hoặc năm sinh",
       type: "number",
       required: true,
       width: "half",
@@ -296,6 +444,7 @@ const form2Structure = {
     {
       id: "a3_phone",
       label: "A3. Số di động",
+      mapToHeader: "Số di động",
       type: "tel",
       required: false,
       width: "half",
@@ -303,6 +452,7 @@ const form2Structure = {
     {
       id: "a4_distance",
       label: "A4. Ước tính khoảng cách từ nơi sinh sống đến bệnh viện (km)",
+      mapToHeader: "Ước tính khoảng cách từ nơi sinh sống đến bệnh viện",
       type: "number",
       required: true,
       width: "half",
@@ -310,6 +460,7 @@ const form2Structure = {
     {
       id: "a5_bhyt",
       label: "A5. Ông/Bà có sử dụng thẻ BHYT cho lần khám bệnh này không?",
+      mapToHeader: "Ông/Bà có sử dụng thẻ BHYT cho lần khám bệnh này không?",
       type: "radio",
       options: ["1. Có", "2. Không"],
       required: true,
@@ -318,6 +469,7 @@ const form2Structure = {
     {
       id: "a6_place",
       label: "A6. Nơi sinh sống hiện nay",
+      mapToHeader: "Nơi sinh sống hiện nay",
       type: "select",
       options: ["1. Thành thị", "2. Nông thôn", "3. Vùng sâu, xa khó khăn"],
       required: true,
@@ -326,6 +478,7 @@ const form2Structure = {
     {
       id: "a7_economy",
       label: "A7. Phân loại mức sống của gia đình",
+      mapToHeader: "Phân loại mức sống của gia đình",
       type: "select",
       options: ["1. Nghèo", "2. Cận nghèo", "3. Khác"],
       required: true,
@@ -335,6 +488,8 @@ const form2Structure = {
       id: "a8_times",
       label:
         "A8. Đây là lần điều trị thứ mấy của Ông/Bà tại bệnh viện? Lần thứ:",
+      mapToHeader:
+        "Đây là lần điều trị thứ mấy của Ông/Bà tại bệnh viện? (Lần thứ:)",
       type: "number",
       required: true,
       width: "full",
@@ -346,14 +501,14 @@ const form2Structure = {
       questions: [
         {
           id: "S_A1",
-          text: "Biển báo, sơ đồ, lối đi, đăng ký (A1-A5)",
+          text: "Biển báo, sơ đồ, lối đi và các kênh đăng ký khám (trực tiếp/điện thoại/website) rõ ràng, dễ tìm, thuận tiện.",
           required: true,
           mapToHeaders: [
             "A1. Các biển báo, chỉ dẫn đường đến bệnh viện rõ ràng, dễ nhìn, dễ tìm",
             "A2. Các sơ đồ, biển báo chỉ dẫn đường đến các khoa, phòng trong bệnh viện rõ ràng, dễ hiểu, dễ tìm",
             "A3. Các khối nhà, cầu thang được đánh số rõ ràng, dễ tìm",
             "A4. Các lối đi trong bệnh viện, hành lang bằng phẳng, dễ đi",
-            "A5. Có thể tìm hiểu các thông tin và đăng ký khám qua điện thoại, trang tin điện tử của bệnh viện (website) thuận tiện",
+            "A5. Có thể tìm hiểu thông tin và đăng ký khám qua điện thoại, website của bệnh viện thuận tiện",
           ],
         },
       ],
@@ -363,7 +518,7 @@ const form2Structure = {
       questions: [
         {
           id: "S_B1",
-          text: "Quy trình, giá niêm yết (B1, B2, B3)",
+          text: "Quy trình khám bệnh, thủ tục và giá dịch vụ được niêm yết rõ ràng, công khai, dễ hiểu.",
           required: true,
           mapToHeaders: [
             "B1. Quy trình khám bệnh được niêm yết rõ ràng, công khai, dễ hiểu",
@@ -373,7 +528,7 @@ const form2Structure = {
         },
         {
           id: "S_B2",
-          text: "Tiếp đón, xếp hàng (B4, B5)",
+          text: "Nhân viên y tế tiếp đón, hướng dẫn tận tình và người bệnh được xếp thứ tự công bằng khi làm thủ tục.",
           required: true,
           mapToHeaders: [
             "B4. Nhân viên y tế tiếp đón, hướng dẫn người bệnh làm các thủ tục niềm nở, tận tình",
@@ -382,7 +537,7 @@ const form2Structure = {
         },
         {
           id: "S_B3",
-          text: "Thời gian chờ đợi (B6-B10)",
+          text: "Đánh giá thời gian chờ đợi khám chữa bệnh.",
           required: true,
           mapToHeaders: [
             "B6. Đánh giá thời gian chờ đợi làm thủ tục đăng ký khám",
@@ -399,19 +554,19 @@ const form2Structure = {
       questions: [
         {
           id: "S_C1",
-          text: "Phòng chờ, vệ sinh, tiện ích (C1-C4, C6)",
+          text: "Cơ sở vật chất phòng chờ (ghế ngồi, quạt/điều hòa, nhà vệ sinh, TV, tranh ảnh, tờ rơi, nước uống…) sạch sẽ, đầy đủ và thuận tiện sử dụng.",
           required: true,
           mapToHeaders: [
-            "C1. Có phòng/sảnh chờ khám sạch sẽ, thoáng mát vào mùa hè; kín gió và ấm áp vào mùa đông",
+            "C1. Có phòng/sảnh chờ khám sạch sẽ, thoáng mát mùa hè; kín gió và ấm áp mùa đông",
             "C2. Phòng chờ có đủ ghế ngồi cho người bệnh và sử dụng tốt",
             "C3. Phòng chờ có quạt (điều hòa) đầy đủ, hoạt động thường xuyên",
-            "C4. Phòng chờ có các phương tiện giúp người bệnh có tâm lý thoải mái như ti-vi, tranh ảnh, tờ rơi, nước uống...",
+            "C4. Phòng chờ có các phương tiện giúp người bệnh thoải mái như ti-vi, tranh ảnh, tờ rơi, nước uống...",
             "C6. Nhà vệ sinh thuận tiện, sử dụng tốt, sạch sẽ",
           ],
         },
         {
           id: "S_C2",
-          text: "Riêng tư, an ninh (C5, C8)",
+          text: "Đảm bảo sự riêng tư, an toàn cho người bệnh (rèm che, vách ngăn, an ninh,…).",
           required: true,
           mapToHeaders: [
             "C5. Được bảo đảm sự riêng tư khi khám bệnh, chiếu chụp, làm thủ thuật",
@@ -420,7 +575,7 @@ const form2Structure = {
         },
         {
           id: "S_C3",
-          text: "Khuôn viên (C7)",
+          text: "Môi trường trong khuôn viên bệnh viện xanh, sạch, đẹp.",
           required: true,
           mapToHeaders: [
             "C7. Môi trường trong khuôn viên bệnh viện xanh, sạch, đẹp",
@@ -433,7 +588,7 @@ const form2Structure = {
       questions: [
         {
           id: "S_D1",
-          text: "Giao tiếp, tôn trọng (D1, D2, D3)",
+          text: "Nhân viên y tế và nhân viên phục vụ có thái độ giao tiếp đúng mực, tôn trọng và công bằng.",
           required: true,
           mapToHeaders: [
             "D1. Nhân viên y tế (bác sỹ, điều dưỡng) có lời nói, thái độ, giao tiếp đúng mực",
@@ -443,7 +598,7 @@ const form2Structure = {
         },
         {
           id: "S_D2",
-          text: "Chuyên môn (D4)",
+          text: "Năng lực chuyên môn của bác sỹ, điều dưỡng đáp ứng mong đợi.",
           required: true,
           mapToHeaders: [
             "D4. Năng lực chuyên môn của bác sỹ, điều dưỡng đáp ứng mong đợi",
@@ -456,16 +611,16 @@ const form2Structure = {
       questions: [
         {
           id: "S_E1",
-          text: "Kết quả, hóa đơn minh bạch (E1, E2)",
+          text: "Kết quả khám bệnh, hồ sơ, đơn thuốc và giải thích của nhân viên y tế rõ ràng, đầy đủ.",
           required: true,
           mapToHeaders: [
-            "E1. Kết quả khám bệnh đã đáp ứng được nguyện vọng của Ông/Bà",
-            "E2. Các hóa đơn, phiếu thu, đơn thuốc và kết quả khám bệnh được cung cấp đầy đủ, rõ ràng, minh bạch và được giải thích nếu có thắc mắc",
+            "E1. Kết quả khám bệnh đáp ứng được nguyện vọng của Ông/Bà",
+            "E2. Hóa đơn, phiếu thu, đơn thuốc và kết quả khám được cung cấp đầy đủ, rõ ràng, minh bạch và được giải thích khi có thắc mắc",
           ],
         },
         {
           id: "S_E2",
-          text: "Tin tưởng, hài lòng giá (E3, E4)",
+          text: "Mức độ tin tưởng và hài lòng chung của Ông/Bà đối với chất lượng và giá dịch vụ y tế.",
           required: true,
           mapToHeaders: [
             "E3. Đánh giá mức độ tin tưởng về chất lượng dịch vụ y tế",
@@ -474,17 +629,17 @@ const form2Structure = {
         },
         {
           id: "S_E3",
-          text: "Chi phí tương xứng (E5)",
+          text: "Ông/Bà cho nhận xét về số tiền chi trả có tương xứng với chất lượng dịch vụ y tế không?",
           required: true,
           isCost: true,
           mapToHeaders: [
-            "E5. Ông/Bà cho nhận xét về số tiền chi trả có tương xứng với chất lượng dịch vụ y tế không?",
+            "E5. Nhận xét về số tiền chi trả có tương xứng với chất lượng dịch vụ y tế không?",
           ],
         },
       ],
     },
   ],
-  footer: commonPatientFooter,
+  footer: form2Footer,
 };
 
 // Mẫu 3: Nhân viên
@@ -493,43 +648,24 @@ const form3Structure = {
   title: "Nhân Viên (Mẫu 03)",
   demographics: [
     {
-      id: "khoa_phong",
-      label: "Khoa phòng của nhân viên",
+      id: "kieu_khao_sat",
+      label: "Kiểu khảo sát",
       type: "select",
-      required: false,
-      width: "full",
       options: [
-        "Khoa Phụ",
-        "Khoa điều trị nội trú sản phụ khoa - Cơ sở Hùng Vương",
-        "Phòng khám đa khoa - Cơ sở Hùng Vương",
-        "Phòng Tổ chức cán bộ",
-        "Phòng Kế hoạch tổng hợp",
-        "Phòng Hành chính quản trị",
-        "Phòng Tài chính kế toán",
-        "Phòng Quản lý chất lượng",
-        "Phòng Điều dưỡng",
-        "Khoa Sản 1",
-        "Khoa Sơ Sinh",
-        "Khoa Sản 2",
-        "Khoa Sản 3",
-        "Khoa Phẫu Thuật Nội Soi",
-        "Khoa Phụ 1",
-        "Khoa Phụ 2",
-        "Khoa Kế hoạch hóa gia đình",
-        "Khoa Quản lý thai nghé và Chẩn đoán trước sinh",
-        "Khoa Chẩn đoán hình ảnh",
-        "Khoa Hỗ trợ sinh sản",
-        "Khoa Khám bệnh",
-        "Khoa Dược",
-        "Khoa Kiểm soát nhiễm khuẩn",
-        "Khoa Đỡ Đẻ",
-        "Khối Xét nghiệm",
-        "Khoa GMHS",
+        "1. Bệnh viện tự đánh giá hàng tháng/quý",
+        "2. Bệnh viện tự đánh giá cuối năm",
+        "3. Do đoàn Bộ Y tế/Sở Y tế thực hiện",
+        "4. Do đoàn phúc tra của BYT thực hiện",
+        "5. Do đoàn kiểm tra chéo",
+        "6. Hình thức khác",
       ],
+      required: true,
+      width: "full",
     },
     {
       id: "a1_gender",
       label: "A1. Giới tính",
+      mapToHeader: "Giới tính",
       type: "radio",
       options: ["1. Nam", "2. Nữ", "3. Khác"],
       required: true,
@@ -538,6 +674,7 @@ const form3Structure = {
     {
       id: "a2_age",
       label: "A2. Tuổi",
+      mapToHeader: "Tuổi",
       type: "number",
       required: true,
       width: "half",
@@ -545,6 +682,7 @@ const form3Structure = {
     {
       id: "a3_job",
       label: "A3. Chuyên môn đào tạo chính",
+      mapToHeader: "Chuyên môn đào tạo chính",
       type: "select",
       options: [
         "1. Bác sỹ",
@@ -559,6 +697,7 @@ const form3Structure = {
     {
       id: "a4_degree",
       label: "A4. Bằng cấp cao nhất của Ông/Bà",
+      mapToHeader: "Bằng cấp cao nhất của Ông/Bà",
       type: "select",
       options: [
         "1. Trung cấp",
@@ -574,6 +713,7 @@ const form3Structure = {
     {
       id: "a5_exp_y",
       label: "A5. Số năm công tác trong ngành Y",
+      mapToHeader: "Số năm công tác trong ngành Y",
       type: "number",
       required: true,
       width: "half",
@@ -581,6 +721,7 @@ const form3Structure = {
     {
       id: "a6_exp_bv",
       label: "A6. Số năm công tác tại bệnh viện hiện nay",
+      mapToHeader: "Số năm công tác tại bệnh viện hiện nay",
       type: "number",
       required: true,
       width: "half",
@@ -588,6 +729,7 @@ const form3Structure = {
     {
       id: "a7_pos",
       label: "A7. Vị trí công tác hiện tại",
+      mapToHeader: "Vị trí công tác hiện tại",
       type: "select",
       options: [
         "1. Lãnh đạo bệnh viện",
@@ -604,6 +746,7 @@ const form3Structure = {
     {
       id: "a8_scope",
       label: "A8. Phạm vi hoạt động chuyên môn",
+      mapToHeader: "Phạm vi hoạt động chuyên môn",
       type: "select",
       options: [
         "1. Khối hành chính",
@@ -625,6 +768,8 @@ const form3Structure = {
     {
       id: "a9_multi",
       label: "A9. Anh/Chị có được phân công kiêm nhiệm nhiều công việc không?",
+      mapToHeader:
+        "Anh/Chị có được phân công kiêm nhiệm nhiều công việc không?",
       type: "radio",
       options: [
         "1. Không kiêm nhiệm",
@@ -637,6 +782,7 @@ const form3Structure = {
     {
       id: "a10_shift",
       label: "A10. Trung bình Anh/Chị trực mấy lần trong một tháng?",
+      mapToHeader: "Trung bình Anh/Chị trực mấy lần trong một tháng?",
       type: "number",
       required: true,
       width: "half",
@@ -657,7 +803,7 @@ const form3Structure = {
           text: "A2. Trang thiết bị văn phòng, bàn ghế làm việc... đầy đủ, các thiết bị cũ, lạc hậu được thay thế kịp thời",
           required: true,
           mapToHeaders: [
-            "A2. Trang thiết bị văn phòng, bàn ghế làm việc... đầy đủ, các thiết bị cũ, lạc hậu được thay thế kịp thời",
+            "A2. Trang thiết bị văn phòng, bàn ghế làm việc đầy đủ; các thiết bị cũ, lạc hậu được thay thế kịp thời",
           ],
         },
         {
@@ -721,9 +867,7 @@ const form3Structure = {
           id: "B1",
           text: "B1. Lãnh đạo có năng lực xử lý, điều hành, giải quyết công việc hiệu quả",
           required: true,
-          mapToHeaders: [
-            "B1. Lãnh đạo có năng lực xử lý, điều hành, giải quyết công việc hiệu quả",
-          ],
+          mapToHeaders: ["B1. Lãnh đạo có năng lực xử lý, điều hành"],
         },
         {
           id: "B2",
@@ -746,7 +890,7 @@ const form3Structure = {
           text: "B4. Lãnh đạo lắng nghe và tiếp thu ý kiến đóng góp NVYT",
           required: true,
           mapToHeaders: [
-            "B4. Lãnh đạo lắng nghe và tiếp thu ý kiến đóng góp NVYT",
+            "B4. Lãnh đạo lắng nghe và tiếp thu ý kiến đóng góp của NVYT",
           ],
         },
         {
@@ -845,7 +989,7 @@ const form3Structure = {
           text: "C7. Thưởng và thu nhập tăng thêm ABC xứng đáng so với cống hiến",
           required: true,
           mapToHeaders: [
-            "C7. Thưởng và thu nhập tăng thêm ABC xứng đáng so với cống hiến",
+            "C7. Thưởng và thu nhập tăng thêm xứng đáng so với cống hiến",
           ],
         },
         {
@@ -963,7 +1107,7 @@ const form3Structure = {
           text: "E3. Tin tưởng vào sự phát triển của bệnh viện. trong tương lai",
           required: true,
           mapToHeaders: [
-            "E3. Tin tưởng vào sự phát triển của bệnh viện. trong tương lai",
+            "E3. Tin tưởng vào sự phát triển của bệnh viện trong tương lai",
           ],
         },
         {
@@ -971,7 +1115,7 @@ const form3Structure = {
           text: "E4. Sẽ gắn bó làm việc tại khoa, phòng hiện tại lâu dài",
           required: true,
           mapToHeaders: [
-            "E4. Sẽ gắn bó làm việc tại khoa, phòng hiện tại lâu dài",
+            "E4. Sẽ gắn bó làm việc tại khoa/phòng hiện tại lâu dài",
           ],
         },
         {
@@ -1002,6 +1146,8 @@ const form3Structure = {
       id: "G_Staff",
       label:
         "G. Anh/Chị có ý kiến hoặc đề xuất nào khác với Bộ Y tế và lãnh đạo bệnh viện?",
+      mapToHeader:
+        "G. Anh/Chị có ý kiến hoặc đề xuất nào khác với Bộ Y tế và lãnh đạo bệnh viện?",
       type: "textarea",
     },
   ],
@@ -1020,7 +1166,6 @@ const db = {
     loadingEl.style.display = "flex";
 
     try {
-      // SỬA: Dùng text/plain để tránh trình duyệt gửi Preflight Request (CORS)
       const response = await fetch(APPS_SCRIPT_URL, {
         method: "POST",
         headers: { "Content-Type": "text/plain;charset=utf-8" },
@@ -1028,7 +1173,8 @@ const db = {
       });
 
       const result = await response.json();
-      if (result.status === "error") throw new Error(result.message);
+      if (result.status === "error")
+        throw new Error(result.data || result.message || "Lỗi không xác định");
 
       return result.data;
     } catch (error) {
@@ -1083,57 +1229,70 @@ const db = {
 };
 
 // ========================================
-// APP OBJECT (Đã cập nhật tính năng Lobby)
+// APP OBJECT
 // ========================================
 const app = {
   currentForm: null,
 
-  init() {
+  async init() {
     const today = new Date();
     document.getElementById("currentDateHeader").textContent =
       today.toLocaleDateString("vi-VN");
 
-    // Mặc định hiển thị trang chủ (Landing Page)
+    await this.loadGlobalConfig();
+
     this.goHome();
     this.updateSessionUI();
   },
 
-  // Hàm chuyển về trang chủ (Lobby)
+  async loadGlobalConfig() {
+    const loadingEl = document.getElementById("loading");
+    if (loadingEl) loadingEl.style.display = "flex";
+
+    try {
+      // Nhận JSON từ Google Sheet
+      const configData = await db.call("getConfig");
+      if (configData && configData.form1) {
+        SESSION_CONFIG = configData;
+        localStorage.setItem(
+          "BYT_SESSION_CONFIG",
+          JSON.stringify(SESSION_CONFIG),
+        );
+      }
+    } catch (e) {
+      console.warn("Lỗi tải cấu hình phiên, dùng cache cũ", e);
+    } finally {
+      if (loadingEl) loadingEl.style.display = "none";
+    }
+  },
+
   goHome() {
     this.hideAllViews();
     document.getElementById("landing-view").classList.remove("hidden");
-    document.getElementById("landing-view").classList.add("flex"); // Đảm bảo căn giữa
+    document.getElementById("landing-view").classList.add("flex");
     window.scrollTo({ top: 0, behavior: "smooth" });
   },
 
-  // Hàm vào trang khảo sát
   startSurvey(formId) {
     this.hideAllViews();
     document.getElementById("survey-view").classList.remove("hidden");
-
-    // Khởi tạo form
     survey.switchForm(formId);
     window.scrollTo({ top: 0, behavior: "smooth" });
   },
 
-  // Hàm hiện trang Admin
   showAdmin() {
     this.hideAllViews();
     document.getElementById("admin-view").classList.remove("hidden");
   },
 
-  // Hàm quay lại Public (từ Admin logout hoặc toggle)
   showPublic() {
-    this.goHome(); // Quay về sảnh chờ
+    this.goHome();
   },
 
-  // Ẩn tất cả các view để tránh chồng chéo
   hideAllViews() {
     document.getElementById("landing-view").classList.add("hidden");
     document.getElementById("landing-view").classList.remove("flex");
-
     document.getElementById("survey-view").classList.add("hidden");
-
     document.getElementById("admin-view").classList.add("hidden");
   },
 
@@ -1155,32 +1314,50 @@ const app = {
   },
 
   updateSessionUI() {
-    if (SESSION_CONFIG) {
-      const interviewer = SESSION_CONFIG.interviewer.split(".")[0];
-      const respondent = SESSION_CONFIG.respondent;
-      document.getElementById("admin-lbl-interviewer").textContent =
-        interviewer;
-      document.getElementById("admin-lbl-respondent").textContent = respondent;
+    const statusDiv = document.getElementById("admin-session-status");
+    if (!statusDiv) return;
+
+    // Check kỹ xem có chuẩn 3 mẫu không
+    if (!SESSION_CONFIG || !SESSION_CONFIG.form1) {
+      statusDiv.innerHTML = '<span class="text-gray-400">Chưa cấu hình</span>';
+      return;
     }
+
+    // Helper rút gọn chữ
+    const shortText = (txt) =>
+      txt ? txt.split(".")[0] : '<span class="text-red-400">Chưa chọn</span>';
+
+    statusDiv.innerHTML = `
+      <div class="mb-2">
+        <span class="font-bold text-teal-700 block">Mẫu 1 & 2:</span>
+        <div class="pl-2 border-l-2 border-teal-200 mt-1">
+          PV: ${shortText(SESSION_CONFIG.form1.nguoipv)}<br>
+          TL: ${shortText(SESSION_CONFIG.form1.nguoi_tra_loi)}
+        </div>
+      </div>
+      <div>
+        <span class="font-bold text-purple-700 block">Mẫu 3:</span>
+        <div class="pl-2 border-l-2 border-purple-200 mt-1">
+          Kiểu: ${shortText(SESSION_CONFIG.form3.kieu_khao_sat)}
+        </div>
+      </div>
+    `;
   },
 };
 
 // ========================================
-// SURVEY OBJECT (Đã cập nhật)
+// SURVEY OBJECT
 // ========================================
 const survey = {
   switchForm(id) {
-    // Set current form structure
     app.currentForm =
       id === 1 ? form1Structure : id === 2 ? form2Structure : form3Structure;
 
-    // Cập nhật tiêu đề form hiển thị
     const titleEl = document.getElementById("current-form-title");
     if (titleEl) {
       titleEl.textContent = app.currentForm.title;
     }
 
-    // Render form
     this.render();
   },
 
@@ -1188,35 +1365,50 @@ const survey = {
     const container = document.getElementById("surveyForm");
     container.innerHTML = "";
 
-    // 1. Render Demographics Section
     this.renderDemographics(container);
 
-    // 2. Render Question Sections
     app.currentForm.sections.forEach((section) => {
       this.renderSection(container, section);
     });
 
-    // 3. Render Footer
     this.renderFooter(container);
-
-    // 4. Render Submit Button
     this.renderSubmitButton(container);
   },
 
   renderDemographics(container) {
-    const div = document.createElement("div");
-    div.className = "bg-white p-6 rounded-xl shadow-sm border border-gray-100";
-    div.innerHTML = `
-            <h2 class="font-bold border-b pb-2 mb-4">I. THÔNG TIN NGƯỜI BỆNH/NHÂN VIÊN</h2>
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4" id="demo-grid"></div>
-        `;
+    const infoFields = ["kieu_khao_sat", "nguoipv", "nguoi_tra_loi"];
 
-    const grid = div.querySelector("#demo-grid");
-    app.currentForm.demographics.forEach((field) => {
-      grid.appendChild(this.createField(field));
-    });
+    const infoDiv = document.createElement("div");
+    infoDiv.className =
+      "bg-white p-6 rounded-xl shadow-sm border border-gray-100";
+    infoDiv.innerHTML = `
+      <h2 class="font-bold border-b pb-2 mb-4">I. THÔNG TIN</h2>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4" id="info-grid"></div>
+    `;
+    const infoGrid = infoDiv.querySelector("#info-grid");
 
-    container.appendChild(div);
+    app.currentForm.demographics
+      .filter((field) => infoFields.includes(field.id))
+      .forEach((field) => {
+        infoGrid.appendChild(this.createField(field));
+      });
+    container.appendChild(infoDiv);
+
+    const demoDiv = document.createElement("div");
+    demoDiv.className =
+      "bg-white p-6 rounded-xl shadow-sm border border-gray-100";
+    demoDiv.innerHTML = `
+      <h2 class="font-bold border-b pb-2 mb-4">II. THÔNG TIN NGƯỜI BỆNH/NHÂN VIÊN</h2>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4" id="demo-grid"></div>
+    `;
+    const demoGrid = demoDiv.querySelector("#demo-grid");
+
+    app.currentForm.demographics
+      .filter((field) => !infoFields.includes(field.id))
+      .forEach((field) => {
+        demoGrid.appendChild(this.createField(field));
+      });
+    container.appendChild(demoDiv);
   },
 
   renderSection(container, section) {
@@ -1260,27 +1452,40 @@ const survey = {
 
   createField(field) {
     const div = document.createElement("div");
-    // Grid column span
     div.className =
       field.width === "full" ? "col-span-1 md:col-span-2" : "col-span-1";
     div.id = `${field.id}_container`;
 
+    // --- LOGIC: Check giá trị Session Config ---
+    let prefilledValue = "";
+    let isReadOnly = false;
+
+    if (SESSION_CONFIG && SESSION_CONFIG[app.currentForm.id]) {
+      const configVal = SESSION_CONFIG[app.currentForm.id][field.id];
+      if (configVal) {
+        prefilledValue = configVal;
+        isReadOnly = true; // Sẽ làm mờ và chặn click
+      }
+    }
+    // -----------------------------------------------
+
     const req = field.required ? "required" : "";
     let inputHTML = "";
 
-    // Style chung cho input mobile: cao 48px (chuẩn touch), chữ 16px (tránh zoom ios)
-    const baseInputClass =
-      "w-full border border-gray-300 p-3 rounded-lg focus:ring-2 focus:ring-teal-500 outline-none text-base appearance-none bg-white shadow-sm";
+    // Thêm class readonly nếu được Admin pre-fill
+    const readOnlyClass = isReadOnly
+      ? "pointer-events-none bg-gray-100 opacity-80"
+      : "bg-white";
+    const baseInputClass = `w-full border border-gray-300 p-3 rounded-lg focus:ring-2 focus:ring-teal-500 outline-none text-base appearance-none shadow-sm ${readOnlyClass}`;
 
     switch (field.type) {
       case "select":
         inputHTML = `
             <div class="relative">
-                <select name="${field.id}" ${req} class="${baseInputClass} pr-8">
+                <select name="${field.id}" ${req} class="${baseInputClass} pr-8" ${isReadOnly ? 'tabindex="-1"' : ""}>
                     <option value="">-- Chạm để chọn --</option>
-                    ${field.options.map((opt) => `<option value="${opt}">${opt}</option>`).join("")}
+                    ${field.options.map((opt) => `<option value="${opt}" ${opt === prefilledValue ? "selected" : ""}>${opt}</option>`).join("")}
                 </select>
-                <!-- Mũi tên chỉ xuống custom -->
                 <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-gray-500">
                     <i class="fas fa-chevron-down text-xs"></i>
                 </div>
@@ -1289,7 +1494,6 @@ const survey = {
         break;
 
       case "radio":
-        // Radio dạng nút bấm ngang hoặc dọc
         inputHTML = `
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-2">
                 ${field.options
@@ -1315,14 +1519,13 @@ const survey = {
         `;
         break;
 
-      default: // text, number, tel...
+      default:
         inputHTML = `
             <div class="relative">
                 <input type="${field.type}" name="${field.id}" ${req} 
                     class="${baseInputClass}" 
                     placeholder="${field.placeholder || ""}"
                     ${field.type === "number" ? 'pattern="[0-9]*" inputmode="numeric"' : ""}> 
-                    <!-- inputmode numeric giúp hiện bàn phím số trên mobile -->
                 ${field.suffix ? `<span class="absolute right-3 top-3 text-gray-400 font-bold">${field.suffix}</span>` : ""}
             </div>
         `;
@@ -1346,15 +1549,12 @@ const survey = {
 
   createQuestion(question) {
     const div = document.createElement("div");
-    // Sử dụng class 'survey-card' từ CSS mới
     div.className = "survey-card relative transition-all duration-300";
     div.id = `${question.id}_container`;
 
     let optionsHTML = "";
 
     if (question.isCost) {
-      // --- XỬ LÝ CÂU HỎI VỀ CHI PHÍ (Dạng liệt kê dọc) ---
-      // Trên mobile, dạng liệt kê dọc (vertical stack) dễ đọc hơn
       const costOptions = [
         "1. Rất đắt so với chất lượng",
         "2. Đắt hơn so với chất lượng",
@@ -1368,9 +1568,6 @@ const survey = {
         <div class="mt-3 space-y-2">
             ${costOptions
               .map((opt) => {
-                // Tách số thứ tự và nội dung để in đậm số
-                const parts = opt.split(". ");
-                const val = parts[0];
                 return `
                 <label class="flex items-start p-3 border border-gray-100 rounded-lg hover:bg-teal-50 cursor-pointer active:bg-teal-100 transition select-none">
                     <input type="radio" name="${question.id}" value="${opt}" required 
@@ -1383,16 +1580,10 @@ const survey = {
         </div>
       `;
     } else {
-      // --- XỬ LÝ CÂU HỎI ĐIỂM SỐ (1-5) ---
-      // Tối ưu layout ngang cho mobile
-      const showZero = app.currentForm.id !== "form3";
-
-      // Label ngắn gọn cho mobile
       const labels = ["Rất kém", "Kém", "TB", "Tốt", "Rất tốt"];
 
       optionsHTML = `
         <div class="mt-4">
-            <!-- Container nút điểm: Flex justify-between để dàn đều trên mọi màn hình -->
             <div class="flex justify-between items-start w-full px-1">
                 ${[1, 2, 3, 4, 5]
                   .map(
@@ -1408,41 +1599,21 @@ const survey = {
                   )
                   .join("")}
             </div>
-
-            ${
-              showZero
-                ? `
-            <!-- Nút N/A (0 điểm) tách riêng một chút nếu có -->
-            <div class="mt-4 pt-3 border-t border-gray-100 flex justify-end items-center">
-                <span class="text-xs text-gray-400 mr-2">Không áp dụng:</span>
-                <div class="flex flex-col items-center">
-                    <input type="radio" name="${question.id}" id="${question.id}_0" value="0" class="rating-input">
-                    <label for="${question.id}_0" class="rating-label !w-10 !h-10 !text-sm text-gray-400 !border-gray-200">
-                        N/A
-                    </label>
-                </div>
-            </div>
-            `
-                : ""
-            }
         </div>
       `;
     }
 
     div.innerHTML = `
         <div class="mb-2">
-            <!-- Mã câu hỏi nhỏ, màu nhạt -->
             <span class="text-xs font-bold text-teal-600 bg-teal-50 px-2 py-1 rounded mb-1 inline-block">
                 ${question.id.replace("S_", "")}
             </span>
-            <!-- Nội dung câu hỏi lớn hơn -->
             <h3 class="font-medium text-gray-800 question-text text-base md:text-lg">
                 ${question.text} 
                 ${question.required ? '<span class="text-red-500 ml-1">*</span>' : ""}
             </h3>
         </div>
         ${optionsHTML}
-        <!-- Thông báo lỗi -->
         <div class="text-xs text-red-500 hidden mt-3 font-bold error-msg flex items-center bg-red-50 p-2 rounded">
             <i class="fas fa-exclamation-circle mr-1"></i> Vui lòng chọn đáp án
         </div>
@@ -1452,7 +1623,6 @@ const survey = {
   },
 
   validate(formData) {
-    // Clear previous errors
     document
       .querySelectorAll(".error-highlight")
       .forEach((el) => el.classList.remove("error-highlight"));
@@ -1462,7 +1632,6 @@ const survey = {
 
     let firstError = null;
 
-    // Validate demographics
     app.currentForm.demographics.forEach((field) => {
       if (field.required && !formData.get(field.id)) {
         const container = document.getElementById(`${field.id}_container`);
@@ -1474,7 +1643,6 @@ const survey = {
       }
     });
 
-    // Validate sections
     app.currentForm.sections.forEach((section) => {
       section.questions.forEach((question) => {
         if (question.required && !formData.get(question.id)) {
@@ -1488,7 +1656,6 @@ const survey = {
       });
     });
 
-    // Validate footer
     app.currentForm.footer.forEach((field) => {
       if (field.required && !formData.get(field.id)) {
         const container = document.getElementById(`${field.id}_container`);
@@ -1500,7 +1667,6 @@ const survey = {
       }
     });
 
-    // Scroll to first error
     if (firstError) {
       firstError.scrollIntoView({ behavior: "smooth", block: "center" });
       return false;
@@ -1512,55 +1678,33 @@ const survey = {
   async handleSubmit(event) {
     event.preventDefault();
 
-    // 1. Kiểm tra cấu hình phiên (Bắt buộc với Mẫu 1 & 2)
-    // Mẫu 3 (Nhân viên) có thể tự điền mà không cần người phỏng vấn
-    if (app.currentForm.id !== "form3" && !SESSION_CONFIG) {
-      alert(
-        "Lỗi: Hệ thống chưa được cấu hình phiên làm việc. Vui lòng liên hệ nhân viên y tế hoặc Admin để thiết lập!",
-      );
-      return;
-    }
-
     const formData = new FormData(event.target);
 
-    // 2. Validate dữ liệu (Kiểm tra các trường bắt buộc)
     if (!this.validate(formData)) return;
 
-    // 3. Chuẩn bị dữ liệu thô
     const rawData = Object.fromEntries(formData.entries());
     const now = new Date();
 
-    // 4. Xây dựng Payload để gửi lên Google Sheets
-    // Các trường này phải khớp với Tên Cột trong Google Sheet
     const payload = {
-      // --- Thông tin chung ---
-      "Kiểu khảo sát": app.currentForm.title,
-      "Mã số phiếu": "", // Sẽ sinh tự động bên dưới
-      "1. Tên bệnh viện": DEFAULT_HOSPITAL,
+      "Kiểu khảo sát": rawData["kieu_khao_sat"] || "",
+      "Mã số phiếu": "",
+      "Tên bệnh viện": DEFAULT_HOSPITAL,
       "Mã bệnh viện": "16410",
-      "2. Ngày điền phiếu": now.toLocaleDateString("vi-VN"),
-
-      // Lấy thông tin từ Session Config (nếu có)
-      "3. Người phỏng vấn/điền phiếu": SESSION_CONFIG
-        ? SESSION_CONFIG.interviewer
-        : "",
-      "4. Người trả lời": SESSION_CONFIG ? SESSION_CONFIG.respondent : "",
+      "Ngày điền phiếu": now.toLocaleDateString("vi-VN"),
+      "Người phỏng vấn/điền phiếu": rawData["nguoipv"] || "",
+      "Người trả lời": rawData["nguoi_tra_loi"] || "",
     };
 
-    // --- Mapping: Thông tin hành chính (Demographics) ---
+    // CORRECTED LOGIC: Use mapToHeader for payload keys
     app.currentForm.demographics.forEach((field) => {
-      // Chỉ lấy các trường có ID bắt đầu bằng 'a' hoặc là 'khoa_phong'
-      if (field.id.startsWith("a") || field.id === "khoa_phong") {
-        payload[field.label] = rawData[field.id] || "";
+      if (field.mapToHeader) {
+        payload[field.mapToHeader] = rawData[field.id] || "";
       }
     });
 
-    // --- Mapping: Câu hỏi khảo sát (Sections) ---
     app.currentForm.sections.forEach((section) => {
       section.questions.forEach((question) => {
         const value = rawData[question.id];
-
-        // Một câu hỏi trong code (ví dụ S_A1) có thể map vào nhiều cột trong Excel
         if (question.mapToHeaders) {
           question.mapToHeaders.forEach((header) => {
             payload[header] = value;
@@ -1569,40 +1713,35 @@ const survey = {
       });
     });
 
-    // --- Mapping: Footer ---
+    // CORRECTED LOGIC: Use mapToHeader for footer payload keys
     app.currentForm.footer.forEach((field) => {
-      payload[field.label] = rawData[field.id] || "";
+      if (field.mapToHeader) {
+        payload[field.mapToHeader] = rawData[field.id] || "";
+      } else {
+        // Fallback for fields without mapToHeader (should not happen with new structure)
+        payload[field.label] = rawData[field.id] || "";
+      }
     });
 
-    // --- Hệ thống: Meta Data (Dùng cho Admin/Code) ---
-    const uniqueId = Date.now().toString().slice(-8); // Tạo ID ngắn 8 số
+    const uniqueId = Date.now().toString().slice(-8);
 
     payload["Mã số phiếu (BV quy định)"] = uniqueId;
     payload["id"] = uniqueId;
     payload["timestamp"] = now.toISOString();
     payload["type"] = app.currentForm.id;
-    payload["selenium_status"] = "READY"; // Đánh dấu để Tool Selenium chạy sau này
+    payload["selenium_status"] = "READY";
 
-    // Lưu toàn bộ dữ liệu thô dạng JSON để Admin dễ dàng sửa lại form sau này
     payload["python_data"] = JSON.stringify(rawData);
 
-    // 5. Gửi dữ liệu (Database Call)
     try {
       await db.save(payload);
 
-      // Thông báo thành công
       app.showToast("Thành công", "Đã gửi phiếu khảo sát!");
 
-      // Reset form
       event.target.reset();
 
-      // === QUAN TRỌNG: Quay về Sảnh Chờ sau 1.5 giây ===
       setTimeout(() => {
-        if (typeof app.goHome === "function") {
-          app.goHome(); // Dùng hàm mới nếu đã cài đặt Page riêng
-        } else {
-          app.showLobby(); // Fallback nếu dùng tên hàm cũ
-        }
+        app.goHome();
       }, 1500);
     } catch (error) {
       console.error("Submit error:", error);

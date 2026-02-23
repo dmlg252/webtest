@@ -13,6 +13,10 @@ const admin = {
   editId: null,
   filteredData: [], // Biến lưu trữ dữ liệu đang hiển thị để xuất Excel
 
+  // Biến dùng cho việc cấu hình phiên 3 mẫu
+  tempSessionData: null,
+  currentSessionTab: "form1",
+
   // Toggle between public and admin view
   async toggleView() {
     if (this.auth) {
@@ -77,34 +81,143 @@ const admin = {
     app.showToast("Thành công", "Đã lưu cấu hình Google Sheets");
   },
 
-  // Session Config Modal
+  // ============================================
+  // SESSION CONFIG MODAL (Đã chia 3 mẫu)
+  // ============================================
+
   openSessionConfig() {
-    if (SESSION_CONFIG) {
-      document.getElementById("session-interviewer").value =
-        SESSION_CONFIG.interviewer;
-      document.getElementById("session-respondent").value =
-        SESSION_CONFIG.respondent;
+    // Clone cấu hình hiện tại để chỉnh sửa tạm thời
+    if (!SESSION_CONFIG) {
+      SESSION_CONFIG = {
+        form1: { kieu_khao_sat: "", nguoipv: "", nguoi_tra_loi: "" },
+        form2: { kieu_khao_sat: "", nguoipv: "", nguoi_tra_loi: "" },
+        form3: { kieu_khao_sat: "" },
+      };
     }
+    this.tempSessionData = JSON.parse(JSON.stringify(SESSION_CONFIG));
+
     document.getElementById("sessionModal").classList.remove("hidden");
+    this.switchSessionTab("form1"); // Mở tab 1 mặc định
   },
 
-  saveSessionConfig() {
-    const interviewer = document
-      .getElementById("session-interviewer")
-      .value.trim();
-    const respondent = document.getElementById("session-respondent").value;
+  switchSessionTab(formId) {
+    // 1. Lưu data của tab hiện tại trước khi chuyển (nếu đang bật UI)
+    this.saveCurrentTabToTemp();
 
-    if (!interviewer || !respondent) {
-      alert("Vui lòng nhập đủ thông tin!");
-      return;
+    // 2. Đổi active UI tab
+    ["form1", "form2", "form3"].forEach((id) => {
+      const btn = document.getElementById(`tab-${id}`);
+      if (id === formId) {
+        btn.classList.add("bg-white", "shadow", "text-teal-700");
+        btn.classList.remove("text-gray-500", "hover:text-gray-700");
+      } else {
+        btn.classList.remove("bg-white", "shadow", "text-teal-700");
+        btn.classList.add("text-gray-500", "hover:text-gray-700");
+      }
+    });
+
+    this.currentSessionTab = formId;
+
+    // 3. Render các input cho tab được chọn
+    const container = document.getElementById("session-fields-container");
+    container.innerHTML = "";
+
+    // Lấy options gốc từ formStructure để render Dropdown
+    const struct =
+      formId === "form1"
+        ? form1Structure
+        : formId === "form2"
+          ? form2Structure
+          : form3Structure;
+    const data = this.tempSessionData[formId];
+
+    // Kiểu khảo sát (Cả 3 mẫu đều có)
+    container.appendChild(
+      this.createSessionSelect(
+        struct.demographics.find((f) => f.id === "kieu_khao_sat"),
+        data.kieu_khao_sat,
+      ),
+    );
+
+    // Người PV & Người TL (Chỉ Mẫu 1 và Mẫu 2)
+    if (formId !== "form3") {
+      container.appendChild(
+        this.createSessionSelect(
+          struct.demographics.find((f) => f.id === "nguoipv"),
+          data.nguoipv,
+        ),
+      );
+      container.appendChild(
+        this.createSessionSelect(
+          struct.demographics.find((f) => f.id === "nguoi_tra_loi"),
+          data.nguoi_tra_loi,
+        ),
+      );
     }
-
-    SESSION_CONFIG = { interviewer, respondent };
-    localStorage.setItem("BYT_SESSION_CONFIG", JSON.stringify(SESSION_CONFIG));
-    document.getElementById("sessionModal").classList.add("hidden");
-    app.updateSessionUI();
-    app.showToast("Thành công", "Đã lưu cấu hình phiên làm việc");
   },
+
+  createSessionSelect(fieldObj, currentValue) {
+    const div = document.createElement("div");
+    let optionsHtml = `<option value="">-- Bỏ trống (Người dùng tự điền) --</option>`;
+    fieldObj.options.forEach((opt) => {
+      optionsHtml += `<option value="${opt}" ${opt === currentValue ? "selected" : ""}>${opt}</option>`;
+    });
+
+    div.innerHTML = `
+      <label class="block text-sm font-medium mb-1">${fieldObj.label}</label>
+      <select id="ses_${fieldObj.id}" class="w-full border border-gray-300 p-2.5 rounded-lg focus:ring-2 focus:ring-teal-500 outline-none bg-white text-sm">
+        ${optionsHtml}
+      </select>
+    `;
+    return div;
+  },
+
+  saveCurrentTabToTemp() {
+    if (!this.tempSessionData) return;
+    const tab = this.currentSessionTab;
+
+    const kieuEl = document.getElementById("ses_kieu_khao_sat");
+    if (kieuEl) this.tempSessionData[tab].kieu_khao_sat = kieuEl.value;
+
+    if (tab !== "form3") {
+      const pvEl = document.getElementById("ses_nguoipv");
+      const tlEl = document.getElementById("ses_nguoi_tra_loi");
+      if (pvEl) this.tempSessionData[tab].nguoipv = pvEl.value;
+      if (tlEl) this.tempSessionData[tab].nguoi_tra_loi = tlEl.value;
+    }
+  },
+
+  async saveSessionConfig() {
+    // 1. Cập nhật input đang hiển thị vào object temp trước
+    this.saveCurrentTabToTemp();
+
+    try {
+      app.showToast("Đang xử lý", "Đang lưu cấu hình lên máy chủ...");
+
+      // 2. Gửi cục JSON lên Google Sheet
+      await db.call("saveConfig", {
+        data: this.tempSessionData,
+      });
+
+      // 3. Nếu thành công, ghi đè biến toàn cục và cache
+      SESSION_CONFIG = JSON.parse(JSON.stringify(this.tempSessionData));
+      localStorage.setItem(
+        "BYT_SESSION_CONFIG",
+        JSON.stringify(SESSION_CONFIG),
+      );
+
+      document.getElementById("sessionModal").classList.add("hidden");
+      app.updateSessionUI(); // Cập nhật Sidebar Admin
+      app.showToast("Thành công", "Đã lưu cấu hình phiên cho các mẫu!");
+    } catch (error) {
+      console.error(error);
+      alert("Lỗi khi lưu lên Google Sheet: " + error.message);
+    }
+  },
+
+  // ============================================
+  // CÁC HÀM QUẢN LÝ DỮ LIỆU & BẢNG
+  // ============================================
 
   // Refresh data
   async refresh() {
@@ -420,54 +533,74 @@ const admin = {
   },
 
   // ============================================
-  // EXPORT EXCEL LOGIC (TRỰC TIẾP)
+  // EXPORT EXCEL LOGIC (NEW: WITH CHOICE MODAL)
   // ============================================
 
   exportExcel() {
-    // 1. Xác định dữ liệu cần xuất
-    // Nếu có chọn checkbox -> Chỉ xuất dòng chọn
-    // Nếu KHÔNG chọn gì -> Xuất toàn bộ bảng đang hiển thị (đã lọc)
-    let dataToExport = [];
+    // Step 1: Just show the choice modal. The real work happens in handleExportChoice.
+    document.getElementById("exportChoiceModal").classList.remove("hidden");
+    document.getElementById("exportSheetSelect").value = ""; // Reset dropdown
+  },
 
-    if (this.selected.length > 0) {
-      // Lấy theo ID đã chọn từ bộ nhớ cache
-      dataToExport = db.cache.filter((record) =>
-        this.selected.includes(record.id),
-      );
-    } else {
-      // Lấy theo dữ liệu đang hiển thị (đã qua bộ lọc ngày, search...)
-      dataToExport = this.filteredData;
-    }
-
-    if (!dataToExport || dataToExport.length === 0) {
-      alert("Không có dữ liệu để xuất!");
+  handleExportChoice() {
+    const selectedSheet = document.getElementById("exportSheetSelect").value;
+    if (!selectedSheet) {
+      alert("Vui lòng chọn một mẫu để xuất.");
       return;
     }
 
-    // 2. Format dữ liệu (Xóa cột hệ thống)
+    // Hide the modal
+    document.getElementById("exportChoiceModal").classList.add("hidden");
+
+    // 1. Filter the entire DB cache for the selected form type
+    const dataToExport = db.cache.filter(
+      (record) => record.type === selectedSheet,
+    );
+
+    if (dataToExport.length === 0) {
+      alert(`Mẫu "${selectedSheet}" không có dữ liệu để xuất.`);
+      return;
+    }
+
+    // 2. Clean the data: remove system columns using destructuring
     const cleanData = dataToExport.map((item) => {
-      // Destructure để loại bỏ các trường hệ thống không cần thiết
-      const { python_data, selenium_status, ...rest } = item;
-      return rest;
+      const {
+        id,
+        timestamp,
+        type,
+        python_data,
+        selenium_status,
+        ...rest // 'rest' will contain all other properties
+      } = item;
+      return rest; // Return only the 'rest' object
     });
 
+    // 3. Create workbook and sheet
     try {
-      // 3. Tạo Workbook
       const worksheet = XLSX.utils.json_to_sheet(cleanData);
       const workbook = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(workbook, worksheet, "DuLieuKhaoSat");
 
-      // 4. Tạo tên file (thêm ngày tháng)
+      const sheetNameMap = {
+        form1: "Mẫu 1 - Nội Trú",
+        form2: "Mẫu 2 - Ngoại Trú",
+        form3: "Mẫu 3 - Nhân Viên",
+      };
+      const sheetName = sheetNameMap[selectedSheet] || "Data";
+
+      XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);
+
+      // 4. Generate filename and download
       const dateStr = new Date().toISOString().slice(0, 10);
-      const count = cleanData.length;
-      const fileName = `BaoCao_KhaoSat_BVPS_${dateStr}_(${count}_phieu).xlsx`;
+      const fileName = `BaoCao_${sheetName.replace(" - ", "_")}_${dateStr}.xlsx`;
 
-      // 5. Tải xuống
       XLSX.writeFile(workbook, fileName);
-      app.showToast("Thành công", `Đã xuất ${count} phiếu ra Excel`);
+      app.showToast(
+        "Thành công",
+        `Đã xuất ${cleanData.length} phiếu của ${sheetName}.`,
+      );
     } catch (e) {
       console.error(e);
-      alert("Lỗi khi tạo file Excel: " + e.message);
+      app.showToast("Lỗi", "Không thể tạo file Excel: " + e.message, "error");
     }
   },
 
@@ -475,33 +608,33 @@ const admin = {
   // EDIT MODAL: XỬ LÝ SỬA TOÀN BỘ (FULL EDIT)
   // ============================================
 
-  // Open edit modal for single record
   openEditModal(id) {
     this.editId = String(id); // Force string ID
     const record = db.cache.find((r) => String(r.id) === String(id));
 
-    if (!record || !record.python_data) {
+    if (!record) {
       alert("Không tìm thấy dữ liệu phiếu");
       return;
     }
 
     try {
-      const pythonData = JSON.parse(record.python_data);
-
       document.getElementById("edit-id-display").textContent =
         record["Mã số phiếu (BV quy định)"] || id;
 
-      this.renderEditForm(pythonData, record.type);
+      this.renderEditForm(record); // Pass the entire record object
       document.getElementById("editRecordModal").classList.remove("hidden");
     } catch (e) {
       alert("Lỗi khi đọc dữ liệu: " + e.message);
     }
   },
 
-  // Render edit form (Đầy đủ: Hành chính, Câu hỏi, Footer)
-  renderEditForm(pythonData, formType) {
+  renderEditForm(record) {
     const container = document.getElementById("edit-form-container");
     container.innerHTML = "";
+
+    // Combine python_data with the main record for easy access
+    const recordData = { ...record, ...JSON.parse(record.python_data || "{}") };
+    const formType = record.type;
 
     const formStruct =
       formType === "form1"
@@ -519,7 +652,7 @@ const admin = {
     demoGrid.className = "grid grid-cols-1 md:grid-cols-2 gap-4";
 
     formStruct.demographics.forEach((field) => {
-      const val = pythonData[field.id] || "";
+      const val = recordData[field.id] || "";
       const fieldHtml = this.renderInputControl(field, val);
       const wrapper = document.createElement("div");
       wrapper.className =
@@ -530,97 +663,84 @@ const admin = {
     demoDiv.appendChild(demoGrid);
     container.appendChild(demoDiv);
 
-    // --- 2. Render Câu hỏi (Sections) ---
-    // Mẫu 3 ẩn điểm 0
-    const scoreValues =
-      formType === "form3" ? [1, 2, 3, 4, 5] : [1, 2, 3, 4, 5, 0];
-
+    // --- 2. Render **DETAILED** Questions (Sections) ---
     formStruct.sections.forEach((section) => {
       const sectionDiv = document.createElement("div");
       sectionDiv.className =
         "mb-6 bg-white p-4 rounded-lg shadow-sm border border-gray-200";
       sectionDiv.innerHTML = `<h3 class="font-bold text-gray-800 mb-3 bg-gray-50 p-2 rounded">${section.title}</h3>`;
 
-      section.questions.forEach((question) => {
-        const questionDiv = document.createElement("div");
-        questionDiv.className = "mb-4 pb-4 border-b last:border-0";
+      // Loop through summary questions to get to the detailed headers
+      section.questions.forEach((summaryQuestion) => {
+        // Now, loop through the detailed headers for each summary question
+        summaryQuestion.mapToHeaders.forEach((detailedHeader) => {
+          const questionDiv = document.createElement("div");
+          questionDiv.className =
+            "mb-4 pb-4 border-b last:border-b-0 last:pb-0 last:mb-0";
 
-        const value = pythonData[question.id] || "";
+          // Get the value from the main record, which corresponds to the Sheet column
+          const value = recordData[detailedHeader] || "";
 
-        // Logic tô màu cảnh báo điểm thấp (chỉ dùng để hiển thị container)
-        const isLow =
-          !question.isCost && parseInt(value) <= 3 && parseInt(value) > 0;
-        const bgClass = isLow ? "bg-red-50 border border-red-200" : "";
+          const isLow =
+            !summaryQuestion.isCost &&
+            parseInt(value) <= 3 &&
+            parseInt(value) > 0;
+          const bgClass = isLow ? "bg-red-50 border border-red-200" : "";
 
-        let inputHTML = "";
+          let inputHTML = "";
 
-        if (question.isCost) {
-          // Câu hỏi chi phí (Giả lập Radio)
-          const fakeField = {
-            id: question.id,
-            label: question.text,
-            type: "radio",
-            options: [
-              "1. Rất đắt so với chất lượng",
-              "2. Đắt hơn so với chất lượng",
-              "3. Tương xứng so với chất lượng",
-              "4. Rẻ hơn so với chất lượng",
-              "5. Không tự chi trả nên không biết",
-              "6. Ý kiến khác",
-            ],
-          };
-          inputHTML = this.renderInputControl(fakeField, value, true);
-        } else {
-          // === SỬA CHỮA CHÍNH: Cấu trúc Peer-Checked cho nút điểm số ===
-          inputHTML = `
-                <div class="flex flex-wrap gap-2 mt-2">
-                    ${scoreValues
-                      .map((v) => {
-                        const isChecked = value == v ? "checked" : "";
-                        // Tạo ID duy nhất cho mỗi nút để Label hoạt động
-                        const uniqueId = `edit_${question.id}_${v}`;
+          if (summaryQuestion.isCost) {
+            const fakeField = {
+              id: `detail_${detailedHeader}`, // Unique ID for this control
+              label: detailedHeader,
+              type: "radio",
+              options: [
+                "1. Rất đắt so với chất lượng",
+                "2. Đắt hơn so với chất lượng",
+                "3. Tương xứng so với chất lượng",
+                "4. Rẻ hơn so với chất lượng",
+                "5. Không tự chi trả / Không biết",
+                "6. Ý kiến khác",
+              ],
+            };
+            inputHTML = this.renderInputControl(fakeField, value, true);
+          } else {
+            const scoreValues =
+              formType === "form3" ? [1, 2, 3, 4, 5] : [1, 2, 3, 4, 5];
+            const radioName = `edit_detail_${detailedHeader.replace(/[^a-zA-Z0-9]/g, "_")}`; // Sanitize name
+            inputHTML = `<div class="flex flex-wrap gap-2 mt-2">
+                  ${scoreValues
+                    .map((v) => {
+                      const isChecked =
+                        String(value) === String(v) ? "checked" : "";
+                      const uniqueId = `${radioName}_${v}`;
+                      let activeColor =
+                        v <= 3 && v > 0
+                          ? "peer-checked:bg-red-500 peer-checked:text-white peer-checked:border-red-500 peer-checked:ring-2 peer-checked:ring-red-200"
+                          : "peer-checked:bg-teal-600 peer-checked:text-white peer-checked:border-teal-600 peer-checked:ring-2 peer-checked:ring-teal-200";
 
-                        // Màu mặc định
-                        let baseColor =
-                          "bg-gray-100 text-gray-600 hover:bg-gray-200";
+                      return `
+                          <div class="relative">
+                              <input type="radio" name="${radioName}" id="${uniqueId}" value="${v}" ${isChecked} class="peer hidden">
+                              <label for="${uniqueId}" class="w-10 h-10 rounded-full flex items-center justify-center font-bold cursor-pointer transition-all border border-transparent select-none bg-gray-100 text-gray-600 hover:bg-gray-200 ${activeColor}">
+                                  ${v}
+                              </label>
+                          </div>
+                      `;
+                    })
+                    .join("")}
+              </div>`;
+          }
 
-                        // Màu khi được chọn (Active)
-                        let activeColor =
-                          "peer-checked:bg-teal-600 peer-checked:text-white peer-checked:border-teal-600 peer-checked:ring-2 peer-checked:ring-teal-200";
+          questionDiv.innerHTML = `
+              <div class="${bgClass} p-2 rounded transition-colors duration-300">
+                  <div class="font-medium text-sm text-gray-700 mb-1">${detailedHeader}</div>
+                  ${inputHTML}
+              </div>`;
 
-                        // Nếu là điểm thấp (1-3), đổi màu active sang đỏ
-                        if (v <= 3 && v > 0) {
-                          activeColor =
-                            "peer-checked:bg-red-500 peer-checked:text-white peer-checked:border-red-500 peer-checked:ring-2 peer-checked:ring-red-200";
-                        }
-
-                        return `
-                            <div class="relative">
-                                <input type="radio" name="edit_${question.id}" id="${uniqueId}" value="${v}" ${isChecked} class="peer hidden">
-                                <label for="${uniqueId}" 
-                                    class="w-10 h-10 rounded-full flex items-center justify-center font-bold cursor-pointer transition-all border border-transparent select-none ${baseColor} ${activeColor}">
-                                    ${v}
-                                </label>
-                            </div>
-                        `;
-                      })
-                      .join("")}
-                </div>
-            `;
-        }
-
-        questionDiv.innerHTML = `
-                    <div class="${bgClass} p-2 rounded transition-colors duration-300">
-                        <div class="font-medium text-sm text-gray-700 mb-1">
-                            <span class="font-bold text-teal-600 mr-1">${question.id}:</span> ${question.text}
-                        </div>
-                        ${inputHTML}
-                    </div>
-                `;
-
-        sectionDiv.appendChild(questionDiv);
+          sectionDiv.appendChild(questionDiv);
+        });
       });
-
       container.appendChild(sectionDiv);
     });
 
@@ -633,7 +753,7 @@ const admin = {
     footerStack.className = "space-y-4";
 
     formStruct.footer.forEach((field) => {
-      const val = pythonData[field.id] || "";
+      const val = recordData[field.id] || "";
       const fieldHtml = this.renderInputControl(field, val);
       const wrapper = document.createElement("div");
       wrapper.innerHTML = fieldHtml;
@@ -643,7 +763,6 @@ const admin = {
     container.appendChild(footerDiv);
   },
 
-  // Helper: Sinh HTML input control cho Edit Form
   renderInputControl(field, currentValue, hideLabel = false) {
     const name = `edit_${field.id}`;
     let html = "";
@@ -659,7 +778,6 @@ const admin = {
                 ${field.options
                   .map(
                     (opt) =>
-                      // So sánh lỏng (==) để bắt cả số và chuỗi
                       `<option value="${opt}" ${opt == currentValue ? "selected" : ""}>${opt}</option>`,
                   )
                   .join("")}
@@ -667,11 +785,10 @@ const admin = {
         break;
 
       case "radio":
-        // Dùng native radio style nhưng bọc kỹ để dễ click
         html += `<div class="space-y-2 mt-1">
                 ${field.options
                   .map((opt, index) => {
-                    const uniqueId = `${name}_opt_${index}`; // ID duy nhất cho label for
+                    const uniqueId = `${name}_opt_${index}`;
                     return `
                         <div class="flex items-center">
                             <input type="radio" id="${uniqueId}" name="${name}" value="${opt}" ${opt == currentValue ? "checked" : ""} 
@@ -697,7 +814,6 @@ const admin = {
     return html;
   },
 
-  // Save single edit (Toàn bộ)
   async saveSingleEdit() {
     if (!this.editId) return;
 
@@ -708,12 +824,7 @@ const admin = {
     }
 
     try {
-      let pythonData = {};
-      try {
-        pythonData = JSON.parse(record.python_data);
-      } catch (e) {
-        pythonData = {};
-      }
+      let pythonData = JSON.parse(record.python_data || "{}");
 
       const formStruct =
         record.type === "form1"
@@ -723,75 +834,69 @@ const admin = {
             : form3Structure;
 
       const modalContainer = document.getElementById("edit-form-container");
+      const updates = {}; // This object will be sent to Google Sheets
 
-      // Helper lấy giá trị từ input
-      const getValue = (fieldId, type) => {
-        const name = `edit_${fieldId}`;
-        if (type === "radio") {
-          const el = modalContainer.querySelector(
-            `input[name="${name}"]:checked`,
-          );
-          return el ? el.value : "";
-        } else {
-          const el = modalContainer.querySelector(`[name="${name}"]`);
-          // Fallback nếu là radio
-          if (el && el.type === "radio") {
-            const checked = modalContainer.querySelector(
-              `input[name="${name}"]:checked`,
-            );
-            return checked ? checked.value : "";
-          }
-          return el ? el.value : "";
-        }
+      // Helper to get values from the form
+      const getControlValue = (name) => {
+        const radioChecked = modalContainer.querySelector(
+          `input[name="${name}"]:checked`,
+        );
+        if (radioChecked) return radioChecked.value;
+        const element = modalContainer.querySelector(`[name="${name}"]`);
+        return element ? element.value : "";
       };
 
-      // === 1. TẠO OBJECT UPDATE ===
-      // python_data: chứa JSON để load lại form sau này
-      // Các key khác: chứa tên cột hiển thị trên Google Sheet
-      const updates = {};
-
-      // --- A. Cập nhật Demographics (Hành chính) ---
+      // --- 1. Save Demographics ---
       formStruct.demographics.forEach((field) => {
-        const val = getValue(field.id, field.type);
-        pythonData[field.id] = val; // Lưu vào JSON
-
-        // Lưu vào cột Excel (dựa trên label)
-        // Ví dụ: field.label = "A1. Giới tính" -> updates["A1. Giới tính"] = "2. Nữ"
-        if (field.label) {
-          updates[field.label] = val;
+        const val = getControlValue(`edit_${field.id}`);
+        pythonData[field.id] = val;
+        if (field.mapToHeader) {
+          updates[field.mapToHeader] = val;
+        } else {
+          // Fallback for fields like kieu_khao_sat
+          if (field.id === "kieu_khao_sat") updates["Kiểu khảo sát"] = val;
+          if (field.id === "nguoipv")
+            updates["Người phỏng vấn/điền phiếu"] = val;
+          if (field.id === "nguoi_tra_loi") updates["Người trả lời"] = val;
         }
       });
 
-      // --- B. Cập nhật Sections (Câu hỏi) ---
+      // --- 2. Save **DETAILED** Section Questions ---
       formStruct.sections.forEach((section) => {
-        section.questions.forEach((q) => {
-          const val = getValue(q.id, "radio");
-          pythonData[q.id] = val; // Lưu vào JSON
+        section.questions.forEach((summaryQuestion) => {
+          let firstValue = null; // To update the summary score in python_data
+          summaryQuestion.mapToHeaders.forEach((detailedHeader, index) => {
+            let val;
+            if (summaryQuestion.isCost) {
+              val = getControlValue(`edit_detail_${detailedHeader}`);
+            } else {
+              const radioName = `edit_detail_${detailedHeader.replace(/[^a-zA-Z0-9]/g, "_")}`;
+              val = getControlValue(radioName);
+            }
 
-          // Lưu vào cột Excel (dựa trên mapToHeaders)
-          // Một câu hỏi code S_A1 có thể map ra cột "A1. Các sơ đồ..."
-          if (q.mapToHeaders && Array.isArray(q.mapToHeaders)) {
-            q.mapToHeaders.forEach((header) => {
-              updates[header] = val;
-            });
-          }
+            // This updates the Google Sheet column
+            updates[detailedHeader] = val;
+
+            if (index === 0) {
+              firstValue = val;
+            }
+          });
+          // Update the summary score in python_data with the score of the first detailed question
+          pythonData[summaryQuestion.id] = firstValue;
         });
       });
 
-      // --- C. Cập nhật Footer ---
+      // --- 3. Save Footer ---
       formStruct.footer.forEach((field) => {
-        const val = getValue(field.id, field.type);
-        pythonData[field.id] = val; // Lưu vào JSON
-
-        if (field.label) {
-          updates[field.label] = val;
+        const val = getControlValue(`edit_${field.id}`);
+        pythonData[field.id] = val;
+        if (field.mapToHeader) {
+          updates[field.mapToHeader] = val;
         }
       });
 
-      // Đưa JSON đã update vào object gửi đi
       updates["python_data"] = JSON.stringify(pythonData);
 
-      // === 2. GỬI LÊN SERVER ===
       await db.update([this.editId], updates);
 
       document.getElementById("editRecordModal").classList.add("hidden");
